@@ -121,7 +121,7 @@ function _md(report) {
   const basis = (report.data_basis || []).map(d => `- ${d}`).join('\n')
   const cases = (report.similar_cases || []).map(c => `- **${c.title}**：${c.peak_impact ?? '详见历史案例库'}`).join('\n')
   const kpis = (report.key_indicators || []).map(k => `- ${k}`).join('\n')
-  return `# 房地产产业链风险分析报告
+  return `# 中国房地产产业链波动分析报告
 
 > 分析问题：**${report.question}**  
 > 综合风险评分：**${report.risk_score} / 100（${report.risk_level}）**  
@@ -153,5 +153,5 @@ ${basis}
 ${kpis}
 
 ---
-*本报告由房地产产业链风险分析智能体自动生成，仅供研究演示。*`
+*本报告由中国房地产产业链波动分析金融智能体自动生成，仅供研究演示。*`
 }

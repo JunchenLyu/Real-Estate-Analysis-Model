@@ -1,10 +1,10 @@
-# 房地产产业链风险分析智能体
-## Real Estate Supply Chain Risk Intelligence Agent
+# 中国房地产产业链波动分析金融智能体
+## China Real Estate Industry Chain Volatility Analysis Financial Intelligence Agent
 
-> 金融人工智能竞赛 Demo 系统 · v1.3.0
+> 金融人工智能竞赛 Demo 系统 · v1.4.0
 > **大模型 Agent + 金融知识库 RAG + 列昂惕夫投入产出模型 + 风险评分** 的深度融合，而非普通聊天机器人。
 
-![version](https://img.shields.io/badge/version-1.3.0-blue) ![python](https://img.shields.io/badge/Python-3.10%2B-3776ab) ![react](https://img.shields.io/badge/React-18-61dafb) ![license](https://img.shields.io/badge/use-研究演示-green)
+![version](https://img.shields.io/badge/version-1.4.0-blue) ![python](https://img.shields.io/badge/Python-3.10%2B-3776ab) ![react](https://img.shields.io/badge/React-18-61dafb) ![license](https://img.shields.io/badge/use-研究演示-green)
 
 ---
 

@@ -1,4 +1,4 @@
-"""房地产产业链风险分析智能体 —— FastAPI 入口"""
+"""中国房地产产业链波动分析金融智能体 —— FastAPI 入口"""
 import json
 import uuid
 from contextlib import asynccontextmanager
@@ -68,7 +68,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="房地产产业链风险分析智能体", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="中国房地产产业链波动分析金融智能体", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -81,10 +81,13 @@ class ChatRequest(BaseModel):
 def chat(req: ChatRequest):
     if not req.question.strip():
         raise HTTPException(400, "问题不能为空")
-    report, trace = AGENT.run(req.question, ctx={
-        "uploads": STATE["uploads"],
-        "dashboard": STATE["dashboard"],
-    })
+    try:
+        report, trace = AGENT.run(req.question, ctx={
+            "uploads": STATE["uploads"],
+            "dashboard": STATE["dashboard"],
+        })
+    except RuntimeError as exc:
+        raise HTTPException(502, str(exc)) from exc
     report["question"] = req.question  # LLM 输出不含此字段，统一在此设置（报告列表标题用）
     report["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
     report["tool_trace"] = trace
@@ -309,7 +312,7 @@ def download_report(rid: str):
     if not path.exists():
         raise HTTPException(404, "报告文件不存在")
     return FileResponse(path, media_type="text/markdown",
-                        filename=f"房地产产业链风险分析报告_{rid}.md")
+                        filename=f"中国房地产产业链波动分析报告_{rid}.md")
 
 
 # ---------- 知识库演示接口 ----------

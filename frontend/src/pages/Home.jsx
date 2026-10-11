@@ -323,7 +323,7 @@ function ReportView({ report }) {
     <div className="card max-w-3xl w-full space-y-6">
       <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-800/70">
         <div>
-          <h3 className="text-gradient font-semibold text-lg">产业链风险分析报告</h3>
+          <h3 className="text-gradient font-semibold text-lg">产业链波动分析报告</h3>
           <p className="text-[11px] text-slate-500 mt-1">由 Agent 自动生成 · 模式 {agent_mode || '-'}</p>
         </div>
         <div className="text-right shrink-0">

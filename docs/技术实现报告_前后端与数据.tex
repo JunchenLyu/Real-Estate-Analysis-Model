@@ -15,12 +15,12 @@
 \usepackage{amsmath}           % 数学公式（\text 等命令）
 
 \hypersetup{colorlinks=true, linkcolor=blue!60!black, urlcolor=blue!70!black,
-            pdftitle={房地产产业链风险分析智能体——技术实现报告}}
+            pdftitle={中国房地产产业链波动分析金融智能体——技术实现报告}}
 
 % ======================== 样式 ========================
 \pagestyle{fancy}
 \fancyhf{}
-\fancyhead[L]{\small 房地产产业链风险分析智能体}
+\fancyhead[L]{\small 中国房地产产业链波动分析金融智能体}
 \fancyhead[R]{\small 技术实现报告}
 \fancyfoot[C]{\thepage}
 \renewcommand{\headrulewidth}{0.4pt}
@@ -43,7 +43,7 @@
 
 \title{%
   \vspace{-1cm}
-  {\Large 房地产产业链风险分析智能体}\\[0.3em]
+  {\Large 中国房地产产业链波动分析金融智能体}\\[0.3em]
   {\LARGE\bfseries 技术实现报告}\\[0.5em]
   {\small\textit{Real Estate Supply Chain Risk Intelligence Agent}}}
 \author{技术组}
@@ -54,7 +54,7 @@
 \thispagestyle{empty}
 
 \begin{abstract}
-本报告介绍``房地产产业链风险分析智能体''的技术实现，涵盖数据资产、后端架构、前端架构与部署方案四个部分。系统以大语言模型（LLM）智能体为调度核心，集成列昂惕夫（Leontief）需求侧模型与 Ghosh 供给侧模型的双投入产出引擎、四指标加权风险评分模型、混合检索知识库（RAG）与结构化案例库，输出含传导三阶段预判的结构化风险分析报告。系统具备双模式降级、数字与文字分离等可靠性设计，支持完全离线运行。经济规律的研究结论由金融方向成员另行完成，不在本报告范围内。
+本报告介绍``中国房地产产业链波动分析金融智能体''的技术实现，涵盖数据资产、后端架构、前端架构与部署方案四个部分。系统以大语言模型（LLM）智能体为调度核心，集成列昂惕夫（Leontief）需求侧模型与 Ghosh 供给侧模型的双投入产出引擎、四指标加权风险评分模型、混合检索知识库（RAG）与结构化案例库，输出含传导三阶段预判的结构化风险分析报告。系统具备双模式降级、数字与文字分离等可靠性设计，支持完全离线运行。经济规律的研究结论由金融方向成员另行完成，不在本报告范围内。
 \end{abstract}
 
 \newpage
@@ -277,6 +277,7 @@ v1.1.0 & 真实数据版（北京 2023 矩阵 + 61 篇文献知识库） \\
 v1.2.0 & 体验升级（SSE 流式 + SQLite 持久化 + 节点画像） \\
 v1.2.1 & 演示保底（一键启动 + 依赖锁定） \\
 v1.3.0 & 双模型引擎（Ghosh 供给侧）、传导三阶段框架、案例库扩充（六房企量化）、问答/报告删除、真实月度数据接入、LaTeX 技术报告 \\
+v1.4.0 & 模式守卫统一（在线/离线共用情景路由）、执行路径标注（execution\_mode）、Ghosh 方向解析修正、更名“中国房地产产业链波动分析金融智能体” \\
 \bottomrule
 \end{tabular}
 \end{table}

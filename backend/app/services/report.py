@@ -47,7 +47,7 @@ def build_markdown(report: dict) -> str:
     rs = report.get("risk_score")
     rs_s = f"{rs}" if isinstance(rs, (int, float)) else "未计算"
     lines = [
-        "# 房地产产业链风险分析报告",
+        "# 中国房地产产业链波动分析报告",
         f"\n> 分析问题：**{report.get('question', '')}**  "
         + (f"\n> 综合风险评分：**{rs_s} / 100（{report.get('risk_level', '')}）**  " if has_model else "")
         + f"\n> 生成时间：{report.get('created_at', '')}",
@@ -135,7 +135,7 @@ def build_markdown(report: dict) -> str:
     lines += ["\n## 6. Conclusion（结论与建议关注指标）"]
     for k in report.get("key_indicators", []):
         lines.append(f"- {k}")
-    lines += ["\n---\n*本报告由房地产产业链风险分析智能体自动生成（LLM Agent + 投入产出模型 + 风险评分模型 + RAG知识库），仅供研究演示，不构成投资建议。*"]
+    lines += ["\n---\n*本报告由中国房地产产业链波动分析金融智能体自动生成（LLM Agent + 投入产出模型 + 风险评分模型 + RAG知识库），仅供研究演示，不构成投资建议。*"]
     return "\n".join(lines)
 
 

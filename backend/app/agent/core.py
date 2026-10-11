@@ -9,7 +9,7 @@ from ..knowledge import rag
 from ..models import input_output as io
 from ..models import risk as risk_model
 
-SYSTEM_PROMPT = """你是「房地产产业链风险分析智能体」，一名资深房地产金融风险分析师。
+SYSTEM_PROMPT = """你是「中国房地产产业链波动分析金融智能体」，一名资深房地产金融风险分析师。
 
 ## 工作准则
 1. 回答任何金融问题前，必须优先调用 search_knowledge_base 检索知识库获取依据。
@@ -80,13 +80,19 @@ class RiskAgent:
                               "result_preview": ev.get("result_preview", "")})
             elif ev["type"] == "final":
                 report = ev["report"]
+            elif ev["type"] == "error":
+                raise RuntimeError(ev.get("message", "分析失败"))
         return report, trace
 
     def run_stream(self, question: str, ctx: dict):
         """生成器：yield {type: tool|final, ...}，供 SSE 流式输出工具轨迹"""
         # 模式路由：offline 强制本地规则引擎；llm_only 不降级（失败直接抛错）
+        if self.mode_setting == "llm_only" and not self.client:
+            yield {"type": "error", "message": "仅LLM模式不可用：未配置 LLM 客户端，不允许降级"}
+            return
         if self.mode_setting == "offline" or not self.client:
             report, trace = self._rule_run(question, ctx)
+            report["execution_mode"] = "offline" if self.mode_setting == "offline" else "rule_fallback"
             for t in trace:
                 yield {"type": "tool", "status": "done", **t}
             yield {"type": "final", "report": report}
@@ -101,6 +107,7 @@ class RiskAgent:
                     yield {"type": "error", "message": f"LLM 调用失败（仅LLM模式，不降级）: {type(e).__name__}: {e}"}
                     return
                 report, trace = self._rule_run(question, ctx)
+                report["execution_mode"] = "rule_fallback"
                 report["summary"] = f"[LLM调用失败已降级: {type(e).__name__}] " + report.get("summary", "")
                 for t in trace:
                     yield {"type": "tool", "status": "done", **t}
@@ -141,17 +148,18 @@ class RiskAgent:
                 report = self._parse_report(msg.content or "")
                 # 分析状态推断：LLM 实际跑成的模型优先（quantified_*），
                 # 未跑模型时按问题语义定性（房价→资产价格 / 价格→成本 / 无幅度→知识问答）
-                if llm_analysis_status:
+                from .core_guards import scenario_status
+                final_status = scenario_status(question)
+                if last_impact:
                     final_status = llm_analysis_status
-                elif _is_house_price_shock(question):
-                    final_status = "asset_price_qualitative"
-                elif _is_price_shock(question):
-                    final_status = "price_qualitative"
-                elif not has_explicit_shock(question):
-                    final_status = "knowledge_only"
-                else:
-                    # 有冲击语义但 LLM 未跑成模型（如被守卫拦截）→ 按守卫原因归入定性
-                    final_status = "price_qualitative"
+                elif final_status.startswith("quantified_"):
+                    # 模型未实际执行时不能标记量化成功；补齐确定性模型结果。
+                    report, trace = self._rule_run(question, ctx)
+                    for t in trace:
+                        yield {"type": "tool", "status": "done", **t}
+                    report["execution_mode"] = "llm_with_rule_completion"
+                    yield {"type": "final", "report": report}
+                    return
                 if report is None:
                     # LLM 输出不可解析 → 规则引擎生成完整结构化报告（数字有保证），LLM 原文作参考附注
                     llm_raw = (msg.content or "").strip()
@@ -161,6 +169,7 @@ class RiskAgent:
                     report["summary"] = str(report.get("summary", "")) + (
                         "｜注：LLM 最终输出未能解析为结构化报告（已回退结构化模板），"
                         "LLM 分析要点摘录：" + llm_raw[:260] + "…")
+                    report["execution_mode"] = "llm_with_rule_completion"
                     # _rule_run 已内置正确的 analysis_status（含 sector_unresolved/missing 等），不覆盖
                     yield {"type": "final", "report": report}
                     return
@@ -174,6 +183,7 @@ class RiskAgent:
                         report.setdefault("data_basis", []).append(f"上传数据: {s.get('filename', fid)}")
                         note = f"（补充：上传数据 {s.get('filename', '')} 分析结论——{s.get('analysis_note', '')}）"
                         report["summary"] = str(report.get("summary", "")) + note
+                report["execution_mode"] = "llm"
                 yield {"type": "final", "report": report}
                 return
             messages.append(msg)
@@ -195,10 +205,13 @@ class RiskAgent:
                 # Canonical Scenario 校验与参数规范化已下沉至 execute_tool（单一守卫入口）
                 result = execute_tool(tc.function.name, args, ctx, question=question)
                 # 守卫拦截原因 → analysis_status（sector_unresolved/missing_magnitude）
-                if result.get("blocked") and "shock_percent" in str(result.get("error", "")):
-                    llm_analysis_status = "missing_magnitude"
-                elif result.get("blocked") and "映射" in str(result.get("error", "")):
-                    llm_analysis_status = "sector_unresolved"
+                if result.get("blocked"):
+                    # 守卫可能返回 reason 或 error；两者都必须参与状态推断。
+                    blocked_reason = str(result.get("reason") or result.get("error") or "")
+                    if "冲击幅度" in blocked_reason or "shock_percent" in blocked_reason:
+                        llm_analysis_status = "missing_magnitude"
+                    elif "映射" in blocked_reason or "行业" in blocked_reason or "口径" in blocked_reason:
+                        llm_analysis_status = "sector_unresolved"
                 # blocked（守卫拦截）/error 结果不进入 last_impact（防止空壳 dict 污染报告）
                 valid_model_result = (
                     not result.get("blocked") and not result.get("error")
@@ -222,6 +235,7 @@ class RiskAgent:
                     "content": json.dumps(result, ensure_ascii=False)[:6000],
                 })
         report, trace = self._rule_run(question, ctx)  # 超轮次兜底（_rule_run 已含统一后处理）
+        report["execution_mode"] = "llm_with_rule_completion"
         for t in trace:
             yield {"type": "tool", "status": "done", **t}
         yield {"type": "final", "report": report}
@@ -274,6 +288,7 @@ class RiskAgent:
             # ---- 无有效模型结果（守卫拦截/未执行）：LLM 编造的量化内容一律删除 ----
             # 宁可不给数字，也不乱算（核心原则：没有经过确定性模型验证的结构化结论，
             # 不允许进入最终报告）
+            report.pop("impact", None)
             report.pop("affected_industries", None)
             report.pop("industry_scores", None)
             report.pop("risk_score", None)
@@ -355,8 +370,9 @@ class RiskAgent:
         supply_hit = _is_supply_side(q)
         price_hit = _is_price_shock(q)
         house_price_hit = _is_house_price_shock(q)
-        supply_sector_unresolved = False  # 供给冲击行业无法映射到13部门时置 True
-        analysis_status = "knowledge_only"  # 默认：知识问答（无量化冲击）
+        from .core_guards import scenario_status
+        analysis_status = scenario_status(q)
+        supply_sector_unresolved = analysis_status == "sector_unresolved"
 
         impact = None
         if house_price_hit and not any(k in q for k in ("投资", "新开工", "销售面积", "施工")):
@@ -366,14 +382,14 @@ class RiskAgent:
                           "result_preview": "房价属资产价格变化，不直接等价于最终需求冲击，输出定性机制分析"})
             impact = None
             analysis_status = "asset_price_qualitative"
-        elif has_shock and price_hit:
+        elif analysis_status == "price_qualitative":
             # 价格/成本冲击（如"涨价""成本上升"）属价格效应 → 不进数量模型，纯定性
             trace.append({"tool": "qualitative_price_analysis",
                           "args": {"question": q},
                           "result_preview": "价格效应不进入数量模型，输出定性机制分析"})
             impact = None
             analysis_status = "price_qualitative"
-        elif has_shock and supply_hit:
+        elif analysis_status == "quantified_ghosh":
             # 数量型供给冲击 → Ghosh（行业识别失败则拒绝量化，不猜测默认行业）
             sector = _supply_sector(q)
             if not sector:
@@ -389,7 +405,7 @@ class RiskAgent:
                 trace.append({"tool": "analyze_supply_shock",
                               "args": {"sector": sector, "shock_percent": pct, "direction": direction},
                               "result_preview": f"Ghosh供给侧：总产出变动 {impact.get('total_output_change_yi')} 亿元"})
-        elif has_shock:
+        elif analysis_status == "quantified_leontief":
             # 数量型需求冲击 → Leontief
             impact = io.analyze_shock(pct, direction)
             analysis_status = "quantified_leontief"
@@ -443,12 +459,12 @@ def has_explicit_shock(question: str) -> bool:
     """是否存在明确的数量冲击幅度（如'下降15%'、'减产10%'）。
     模型运行的前提条件：没有明确幅度的问题不进入数量模型（防 LLM 脑补默认值）。"""
     return bool(re.search(
-        r"(上升|上涨|增长|下跌|下降|回落|下滑|减产|收缩|供给收缩|供给下降)\s*\d+(\.\d+)?\s*%?",
+        r"(上升|上涨|增长|下跌|下降|回落|下滑|减产|增产|收缩|扩产|供给收缩|供给下降|供给增加)\s*\d+(\.\d+)?\s*%?",
         question))
 
 
 # 数量型供给冲击关键词（Ghosh 模型的适用域）；"涨价"属价格效应，不做精确量化
-_SUPPLY_KWS = ("减产", "供给收缩", "供给下降", "停产", "限产", "供给减少")
+_SUPPLY_KWS = ("减产", "增产", "扩产", "供给收缩", "供给下降", "供给增加", "停产", "限产", "供给减少")
 _PRICE_KWS = ("涨价", "价格上升", "价格上涨", "成本上升", "房价上涨", "房价下降",
               "房价下跌", "房价涨", "房价跌")  # 价格/资产估值冲击 → 定性提示，不进数量模型
 _DEMAND_BYPASS = ("房地产", "楼市", "销售", "投资", "需求")  # 注意：房价不在需求旁路（它属于价格维度）
@@ -556,11 +572,11 @@ def _supply_sector(q: str) -> str:
 
 
 def _parse_shock(q: str) -> tuple[float, str, bool]:
-    m = re.search(r"(上升|上涨|增长|下跌|下降|回落|下滑|减产|收缩)\s*(\d+(?:\.\d+)?)\s*%?", q)
+    m = re.search(r"(上升|上涨|增长|下跌|下降|回落|下滑|减产|增产|收缩|扩产|供给收缩|供给下降|供给增加)\s*(\d+(?:\.\d+)?)\s*%?", q)
     if not m:
         return 0.0, "下降", False
     word, num = m.group(1), float(m.group(2))
-    direction = "上升" if word in ("上升", "上涨", "增长") else "下降"
+    direction = "上升" if word in ("上升", "上涨", "增长", "增产", "扩产", "供给增加") else "下降"
     return num, direction, True
 
 
@@ -686,6 +702,14 @@ def _compose_report(question, kb, impact, industry_scores, agg, similar_cases, u
                 "下游承压：家电、家具等后周期消费需求下滑（收入-消费渠道）",
                 "金融传导：房企信用风险暴露，银行敞口与抵押品价值承压（金融加速器渠道）",
             ]
+        if impact.get("total_output_change_yi", 0) > 0:
+            summary += " 本情景为数量扩张而非收缩，传导方向应按投入增加及关联需求增长理解。"
+            transmission = ["初始投入增加" if is_ghosh else "房地产与建筑业最终需求增加",
+                            "产业关联投入及需求增加", "上下游产出情景扩张（非实际产出预测）"]
+            summary = summary.replace("供给收缩 → 中间投入成本上升 → 下游生产受阻", "初始投入增加 → 中间投入传导 → 下游产出扩张")
+            summary = summary.replace("本情景属于供给约束型冲击", "本情景属于供给扩张情景")
+            summary = summary.replace("房地产投资收缩 → 上游原材料需求下降 → 中游建造活动放缓 → 下游耐用品消费承压",
+                                      "房地产投资增加 → 上游关联需求增长 → 中下游活动扩张")
         # 传导三阶段预判（需求侧：六案例归纳框架；供给侧：供给约束传导框架）
         stages = impact.get("transmission_stages", {})
         if stages:
