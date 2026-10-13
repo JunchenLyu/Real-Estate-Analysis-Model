@@ -33,6 +33,9 @@ frontend/dist/
 # 版权论文（不入公开仓库）
 *.pdf
 
+# 内部需求文档（不入公开仓库）
+智能体V2.0迭代内容*.docx
+
 # 原始竞赛资料目录（体积大；系统用其提取产物：io_table.json + imported_*.md）
 项目竞赛资料/
 *.log
