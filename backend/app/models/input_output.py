@@ -87,6 +87,8 @@ def _stage_forecast(rows: list, shock_pct: float, direction: str, kind: str = "d
         fw = _json.loads((_DD / "transmission_stages.json").read_text(encoding="utf-8"))
     except Exception:
         return {}
+    if direction == "上升" or shock_pct == 0:
+        return {}
     stage_list = fw.get("stages_supply") if kind == "supply" else fw.get("stages")
     if not stage_list:
         return {}

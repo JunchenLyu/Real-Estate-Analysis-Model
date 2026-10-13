@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { chat, riskColor, getHealth, getAgentMode, setAgentMode } from '../api.js'
+import { apiUrl, api, chat, riskColor, getHealth, getAgentMode, setAgentMode } from '../api.js'
 import Chart from '../components/Chart.jsx'
 
 const MODE_OPTIONS = [
@@ -42,12 +42,9 @@ export default function Home() {
     setModeOpen(false)
   }
 
-  // 删除单条对话（AI消息含报告时连报告一起删；user+ai 成对删除）
+  // 删除成对对话，持久化报告在报告中心管理。
   const delMsg = (i) => {
     const m = messages[i]
-    if (m?.report?.report_id) {
-      fetch(`http://localhost:8000/api/report/${m.report.report_id}`, { method: 'DELETE' }).catch(() => {})
-    }
     setMessages(msgs => {
       const out = [...msgs]
       let a = i, b = i
@@ -60,10 +57,6 @@ export default function Home() {
 
   const clearAll = () => {
     if (!confirm(`清空全部 ${messages.length} 条对话？（已生成的报告仍可在报告中心删除）`)) return
-    // 批量删除关联报告
-    messages.filter(m => m.report?.report_id).forEach(m => {
-      fetch(`http://localhost:8000/api/report/${m.report.report_id}`, { method: 'DELETE' }).catch(() => {})
-    })
     setMessages([])
   }
 
@@ -78,32 +71,43 @@ export default function Home() {
     setMessages(m => [...m, { role: 'ai', streaming: true, traceKey, events: [] }])
     try {
       const resp = await fetch(
-        `http://localhost:8000/api/chat/stream?q=${encodeURIComponent(question)}`)
+        apiUrl(`/api/chat/stream?q=${encodeURIComponent(question)}`))
       if (!resp.ok || !resp.body) throw new Error(`HTTP ${resp.status}`)
       const reader = resp.body.getReader()
       const decoder = new TextDecoder()
       let buf = ''
-      for (;;) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, { stream: true })
-        const lines = buf.split('\n\n')
-        buf = lines.pop()  // 末尾可能是不完整块
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue
-          const payload = line.slice(6)
-          if (payload === '[DONE]') continue
-          let ev
-          try { ev = JSON.parse(payload) } catch { continue }
-          setMessages(m => m.map(msg =>
-            msg.traceKey === traceKey
-              ? (ev.type === 'tool'
-                  ? { ...msg, events: [...msg.events, ev] }
-                  : ev.type === 'error'
-                    ? { ...msg, streaming: false, error: ev.message }
-                    : { ...msg, report: ev.report, streaming: false })
-              : msg))
+      let terminal = false
+      try {
+        for (;;) {
+          const { done, value } = await reader.read()
+          buf += done ? decoder.decode() : decoder.decode(value, { stream: true })
+          buf = buf.replace(/\r\n/g, '\n')
+          const lines = buf.split('\n\n')
+          buf = lines.pop()
+          if (done && buf.trim()) lines.push(buf)
+          for (const line of lines) {
+            const payload = line.split('\n').filter(l => l.startsWith('data:'))
+              .map(l => l.slice(5).trimStart()).join('\n')
+            if (!payload || payload === '[DONE]') continue
+            const ev = JSON.parse(payload)
+            if (!['tool', 'error', 'final'].includes(ev.type)) continue
+            if (ev.type === 'final' && !ev.report) throw new Error('服务返回的报告为空')
+            if (ev.type !== 'tool') terminal = true
+            setMessages(m => m.map(msg =>
+              msg.traceKey === traceKey
+                ? (ev.type === 'tool'
+                    ? { ...msg, events: [...msg.events, ev] }
+                    : ev.type === 'error'
+                      ? { ...msg, streaming: false, error: ev.message || '分析失败' }
+                      : { ...msg, report: ev.report, streaming: false })
+                : msg))
+          }
+          if (done || terminal) break
         }
+        if (!terminal) throw new Error('连接已中断，未收到完整分析结果，请重试')
+      } finally {
+        await reader.cancel().catch(() => {})
+        reader.releaseLock()
       }
     } catch (e) {
       setMessages(m => m.map(msg =>

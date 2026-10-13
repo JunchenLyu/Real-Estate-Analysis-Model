@@ -116,6 +116,8 @@ def execute_tool(name: str, arguments: dict, ctx: dict | None = None,
     ctx = ctx or {}
     # ---- 服务端路由守卫 ----
     from .core_guards import check_tool_allowed
+    if name == "compute_risk_score":
+        return {"blocked": True, "reason": "风险评分由确定性行业模型或上传数据计算，不接受 LLM 自行提供的指标"}
     if name in ("analyze_industry_chain_impact", "analyze_supply_shock"):
         allowed, reason = check_tool_allowed(name, question)
         if not allowed:

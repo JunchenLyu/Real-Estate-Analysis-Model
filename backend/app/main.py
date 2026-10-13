@@ -56,19 +56,26 @@ def _refresh_dashboard(report: dict):
     d["updated_at"] = report.get("created_at")
 
 
+def _rebuild_dashboard():
+    STATE["dashboard"] = _default_dashboard()
+    reports = sorted(STATE["reports"].values(), key=lambda r: r.get("created_at", ""))
+    for report in reports:
+        _refresh_dashboard(report)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     kb_status = rag.build_knowledge_base()
-    STATE["dashboard"] = _default_dashboard()
     # SQLite 持久化恢复（重启后报告/上传历史不丢）
     db = store.init_db()
     STATE["reports"] = store.load_reports()
     STATE["uploads"] = store.load_uploads()
+    _rebuild_dashboard()
     print(f"[DB] {db} 恢复: {len(STATE['reports'])} 报告, {len(STATE['uploads'])} 上传  |  Agent 模式: {AGENT.mode}")
     yield
 
 
-app = FastAPI(title="中国房地产产业链波动分析金融智能体", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="中国房地产产业链波动分析金融智能体", version="1.4.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 
@@ -109,19 +116,36 @@ def chat_stream(q: str):
     from fastapi.responses import StreamingResponse
 
     def gen():
-        for ev in AGENT.run_stream(q, ctx={"uploads": STATE["uploads"],
-                                           "dashboard": STATE["dashboard"]}):
-            if ev["type"] == "final":
-                report = ev["report"]
-                report["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
-                report["question"] = q
-                report["agent_mode"] = AGENT.mode
-                report["report_id"] = str(uuid.uuid4())[:8]
-                STATE["reports"][report["report_id"]] = report
-                report_svc.save_report(report)
-                store.save_report(report)
-                _refresh_dashboard(report)
-            yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+        trace = []
+        terminal = False
+        try:
+            for ev in AGENT.run_stream(q, ctx={"uploads": STATE["uploads"],
+                                               "dashboard": STATE["dashboard"]}):
+                if ev["type"] == "tool":
+                    trace.append({k: v for k, v in ev.items() if k != "type"})
+                elif ev["type"] == "final":
+                    report = ev["report"]
+                    report["created_at"] = datetime.now().strftime("%Y-%m-%d %H:%M")
+                    report["question"] = q
+                    report["agent_mode"] = AGENT.mode
+                    report["tool_trace"] = trace
+                    report["report_id"] = str(uuid.uuid4())[:8]
+                    report_svc.save_report(report)
+                    store.save_report(report)
+                    STATE["reports"][report["report_id"]] = report
+                    _refresh_dashboard(report)
+                    terminal = True
+                elif ev["type"] == "error":
+                    terminal = True
+                yield f"data: {json.dumps(ev, ensure_ascii=False)}\n\n"
+                if terminal:
+                    break
+            if not terminal:
+                yield 'data: {"type": "error", "message": "分析未返回完整结果，请重试"}\n\n'
+        except Exception:
+            import logging
+            logging.getLogger(__name__).exception("流式分析失败")
+            yield 'data: {"type": "error", "message": "分析或报告保存失败，请重试"}\n\n'
         yield "data: [DONE]\n\n"
 
     return StreamingResponse(gen(), media_type="text/event-stream",
@@ -154,7 +178,7 @@ def set_agent_mode(req: AgentModeRequest):
 # ---------- 数据上传 ----------
 @app.post("/api/upload")
 async def upload(file: UploadFile = File(...)):
-    if not file.filename.lower().endswith((".csv", ".xlsx", ".xls")):
+    if not file.filename or not file.filename.lower().endswith((".csv", ".xlsx", ".xls")):
         raise HTTPException(400, "仅支持 CSV / Excel 文件")
     fid = str(uuid.uuid4())[:8]
     path = UPLOAD_DIR / f"{fid}_{file.filename}"
@@ -291,6 +315,7 @@ def delete_report(rid: str):
     STATE["reports"].pop(rid)
     store.delete_report(rid)
     (REPORTS_DIR / f"{rid}.md").unlink(missing_ok=True)
+    _rebuild_dashboard()
     return {"deleted": rid}
 
 
@@ -302,6 +327,7 @@ def delete_all_reports():
         (REPORTS_DIR / f"{rid}.md").unlink(missing_ok=True)
     STATE["reports"].clear()
     store.clear_reports()
+    _rebuild_dashboard()
     return {"deleted_count": len(ids)}
 
 

@@ -12,7 +12,10 @@ export default function Dashboard() {
   useEffect(() => {
     // 数据未变化时返回原引用，避免 8 秒轮询触发图表重渲染（图谱节点跳位置）
     const load = () => getDashboard()
-      .then(d => setData(prev => JSON.stringify(prev) === JSON.stringify(d) ? prev : d))
+      .then(d => {
+        setData(prev => JSON.stringify(prev) === JSON.stringify(d) ? prev : d)
+        setError(null)
+      })
       .catch(e => setError(e.message))
     load()
     const t = setInterval(load, 8000)  // 轮询最新分析

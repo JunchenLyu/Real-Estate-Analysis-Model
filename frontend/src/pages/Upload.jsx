@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { uploadFile, riskColor, api } from '../api.js'
+import { uploadFile, riskColor, api, apiUrl } from '../api.js'
 
 export default function Upload() {
   const [result, setResult] = useState(null)
@@ -164,7 +164,7 @@ export default function Upload() {
                     {u.risk_score} · {u.risk_level}
                   </span>
                 )}
-                <a href={`http://localhost:8000/api/upload/${u.file_id}/raw`} target="_blank" rel="noreferrer"
+                <a href={apiUrl(`/api/upload/${u.file_id}/raw`)} target="_blank" rel="noreferrer"
                   className="text-xs px-2.5 py-1 rounded-md bg-slate-800 hover:bg-slate-700 text-slate-300 shrink-0 no-underline">
                   原文
                 </a>

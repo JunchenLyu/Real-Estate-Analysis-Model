@@ -1,5 +1,6 @@
 """Module 1: Agent 核心 —— LLM Function Calling 循环 + 规则引擎降级"""
 import json
+import math
 import re
 import uuid
 
@@ -293,6 +294,7 @@ class RiskAgent:
             report.pop("industry_scores", None)
             report.pop("risk_score", None)
             report.pop("risk_level", None)
+            report.pop("transmission_stages", None)
             reason = ANALYSIS_STATUS_META.get(status, {}).get("no_model_reason", "")
             if reason:
                 report["no_model_reason"] = reason
@@ -375,7 +377,7 @@ class RiskAgent:
         supply_sector_unresolved = analysis_status == "sector_unresolved"
 
         impact = None
-        if house_price_hit and not any(k in q for k in ("投资", "新开工", "销售面积", "施工")):
+        if analysis_status == "asset_price_qualitative":
             # 房价涨跌 = 资产价格/估值变化，不直接等价于最终需求数量变化 → 定性分析
             trace.append({"tool": "qualitative_asset_price_analysis",
                           "args": {"question": q},
@@ -458,9 +460,7 @@ class RiskAgent:
 def has_explicit_shock(question: str) -> bool:
     """是否存在明确的数量冲击幅度（如'下降15%'、'减产10%'）。
     模型运行的前提条件：没有明确幅度的问题不进入数量模型（防 LLM 脑补默认值）。"""
-    return bool(re.search(
-        r"(上升|上涨|增长|下跌|下降|回落|下滑|减产|增产|收缩|扩产|供给收缩|供给下降|供给增加)\s*\d+(\.\d+)?\s*%?",
-        question))
+    return _parse_shock(question)[2]
 
 
 # 数量型供给冲击关键词（Ghosh 模型的适用域）；"涨价"属价格效应，不做精确量化
@@ -523,11 +523,10 @@ def _is_price_shock(q: str) -> bool:
 def _is_supply_side(q: str) -> bool:
     """判别供给侧冲击：含数量型供给词（减产/限产等），且主体非房地产类需求侧词。
     价格类词（涨价等）单独识别为价格效应提示，不进入 Ghosh 数量测算。"""
-    if any(k in q for k in _PRICE_KWS):
+    from .core_guards import _has_price, _has_house_price
+    if _has_price(q) or _has_house_price(q):
         return False
-    if not any(k in q for k in _SUPPLY_KWS):
-        return False
-    return not any(k in q for k in _DEMAND_BYPASS)
+    return bool(re.search(_SUPPLY_PATTERN, q))
 
 
 # 行业别名表：自然语言 → 13 部门口径（含口语/常用简称）
@@ -553,6 +552,7 @@ _SECTOR_ALIASES = {
 def _supply_sector(q: str) -> str:
     """提取供给侧冲击行业：别名表 → 部门名直配 → 识别失败返回空串（不猜测默认行业）
     最终校验：映射结果必须属于模型 13 部门（io.SECTOR_NAMES），否则拒绝。"""
+    q = _shock_subject(q)
     result = ""
     # 1) 别名表（长词优先，避免"家具"误命中"家具制造"之外的场景）
     for alias in sorted(_SECTOR_ALIASES, key=len, reverse=True):
@@ -571,12 +571,24 @@ def _supply_sector(q: str) -> str:
     return result
 
 
+_SUPPLY_PATTERN = r"供给收缩|供给下降|供给增加|供给减少|减产|增产|扩产|停产|限产"
+_SHOCK_PATTERN = rf"({_SUPPLY_PATTERN}|上升|上涨|增长|下跌|下降|回落|下滑|收缩)"
+
+
+def _shock_subject(q: str) -> str:
+    match = re.search(_SHOCK_PATTERN, q)
+    subject = q[:match.start()] if match else q
+    return re.split(r"[，,。；;！？!?]", subject)[-1]
+
+
 def _parse_shock(q: str) -> tuple[float, str, bool]:
-    m = re.search(r"(上升|上涨|增长|下跌|下降|回落|下滑|减产|增产|收缩|扩产|供给收缩|供给下降|供给增加)\s*(\d+(?:\.\d+)?)\s*%?", q)
+    m = re.search(_SHOCK_PATTERN + r"\s*(\d+(?:\.\d+)?)\s*[%％]", q)
     if not m:
         return 0.0, "下降", False
     word, num = m.group(1), float(m.group(2))
     direction = "上升" if word in ("上升", "上涨", "增长", "增产", "扩产", "供给增加") else "下降"
+    if not math.isfinite(num) or (direction == "下降" and num > 100):
+        return 0.0, direction, False
     return num, direction, True
 
 

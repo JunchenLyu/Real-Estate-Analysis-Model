@@ -22,16 +22,15 @@ def _has_supply(q: str) -> bool:
 
 def scenario_status(question: str) -> str:
     """在线和离线共用的情景分类，不依赖 LLM 是否尝试调用工具。"""
-    from .core import _is_supply_side, _supply_sector
-    if _has_house_price(question) and not any(
-        k in question for k in ("投资", "新开工", "销售面积", "施工")
-    ):
+    from .core import _is_supply_side, _supply_sector, _shock_subject
+    if _has_house_price(question):
         return "asset_price_qualitative"
     if _has_price(question):
         return "price_qualitative"
     supply = _is_supply_side(question)
-    demand = any(k in question for k in ("房地产", "房产", "楼市", "开发")) and any(
-        k in question for k in ("投资", "销售", "新开工", "施工", "需求")
+    subject = _shock_subject(question)
+    demand = any(k in subject for k in ("房地产", "房产", "楼市", "开发")) and any(
+        k in subject for k in ("投资", "销售", "新开工", "施工", "需求")
     )
     if not has_explicit_shock(question):
         return "missing_magnitude" if supply or demand else "knowledge_only"
@@ -78,6 +77,8 @@ def check_tool_allowed(tool: str, question: str) -> tuple[bool, str]:
     """完整路由守卫：校验模型调用是否满足适用条件。返回 (allowed, reason)。
     四层检查：明确冲击幅度 → 问题类型 → 模型匹配。"""
     em = expected_model(question)
+    if tool == "compute_risk_score":
+        return False, "风险评分须由确定性行业模型或上传指标计算，不接受 LLM 自行提供的指标"
     if em == "none":
         if tool in ("analyze_industry_chain_impact", "analyze_supply_shock"):
             return False, _unresolved_reason(question)

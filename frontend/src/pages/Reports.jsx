@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { marked } from 'marked'
-import { listReports, getReport, deleteReport, deleteAllReports } from '../api.js'
+import DOMPurify from 'dompurify'
+import { apiUrl, listReports, getReport, deleteReport, deleteAllReports } from '../api.js'
 
 export default function Reports() {
   const [list, setList] = useState([])
@@ -56,7 +57,9 @@ export default function Reports() {
                 onClick={() => open(r.report_id)}>
                 <div className="text-sm text-slate-200 truncate pr-6">{r.question || '未命名分析'}</div>
                 <div className="text-xs text-slate-500 mt-1.5">
-                  风险 <span className="text-slate-300 font-medium">{r.risk_score}</span> · {r.risk_level} · {r.created_at}
+                  {r.risk_score != null
+                    ? <>风险 <span className="text-slate-300 font-medium">{r.risk_score}</span> · {r.risk_level}</>
+                    : <span>{r.analysis_status_label || '定性分析'}</span>} · {r.created_at}
                 </div>
                 <button onClick={e => { e.stopPropagation(); del(r.report_id) }}
                   title="删除此报告"
@@ -70,13 +73,13 @@ export default function Reports() {
             {selected ? (
               <>
                 <div className="flex gap-3 mb-5 no-print">
-                  <a href={`http://localhost:8000/api/report/${selected.report_id}/download`}
+                  <a href={apiUrl(`/api/report/${selected.report_id}/download`)}
                     className="text-xs px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors">下载 Markdown</a>
                   <button onClick={() => window.print()}
                     className="text-xs px-3.5 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-cyan-500 text-white shadow-lg shadow-blue-900/40 transition-all">导出 PDF</button>
                 </div>
                 <div className="report-body text-sm text-slate-300 leading-7"
-                  dangerouslySetInnerHTML={{ __html: marked.parse(_md(selected)) }} />
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(_md(selected))) }} />
               </>
             ) : (
               <div className="text-sm text-slate-500 h-40 flex flex-col items-center justify-center gap-3">
@@ -124,14 +127,14 @@ function _md(report) {
   return `# 中国房地产产业链波动分析报告
 
 > 分析问题：**${report.question}**  
-> 综合风险评分：**${report.risk_score} / 100（${report.risk_level}）**  
+> ${report.risk_score != null ? `综合风险评分：**${report.risk_score} / 100（${report.risk_level || '未分级'}）**` : `分析状态：**${report.analysis_status_label || '定性分析'}，未计算风险评分**`}  
 > 生成时间：${report.created_at}
 
 ## 1. Executive Summary
 ${report.summary}
 
 ## 2. Risk Assessment
-${scores || '- ' + report.risk_level}
+${scores || (report.risk_score != null ? '- 综合风险：' + report.risk_score + '（' + (report.risk_level || '未分级') + '）' : '- 未进行量化风险评分')}
 
 ## 3. Transmission Mechanism（传导机制）
 ${steps}${stagesMd}
