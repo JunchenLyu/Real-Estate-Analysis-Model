@@ -42,7 +42,29 @@ def _industries_md(rows: list[dict]) -> str:
     return "\n".join(lines)
 
 
+def enrich_v2(report: dict) -> dict:
+    impact = report.get("impact") or {}
+    expansion = impact.get("total_output_change_yi", 0) > 0
+    context = "数量扩张情景：关注承接能力和资金占用，不能据此推断违约风险上升。" if expansion else "收缩或未量化情景：核验订单、回款和现金流，不据此推断具体企业必然违约。"
+    report["report_version"] = "2.0"
+    report["mechanism_notes"] = [
+        {"name": "实体需求渠道", "path": "销售回款 → 新开工与施工计划 → 钢铁、建材及设备订单", "indicators": ["销售面积", "新开工面积", "工业品产量", "营业收入"], "boundary": "数量模型刻画投入关联；不直接估计企业收入或利润。"},
+        {"name": "贸易信用渠道", "path": "回款变化 → 工程款及商票结算 → 应收占款 → 供应商现金流", "indicators": ["应收账款周转天数", "逾期商票", "经营现金流", "客户集中度"], "boundary": "企业季度面板尚未接入，当前为待验证机制，不能由宏观相关系数确认。"},
+        {"name": "交付与后周期需求", "path": "项目施工与竣工交付 → 装修、家具及家电需求", "indicators": ["竣工面积", "家具家电收入", "毛利率"], "boundary": "建设周期不等于固定统计时滞；0—6、0—3、12—24个月仅为资料提出的待检验窗口。"},
+        {"name": "收入与融资反馈", "path": "企业经营变化 → 就业收入与融资能力 → 购房需求及投资计划", "indicators": ["居民收入", "就业", "现金短债比", "融资成本"], "boundary": "现有静态模型未内生估计该反馈，不代表已完成动态因果仿真。"},
+    ]
+    report["stakeholder_recommendations"] = [
+        {"stakeholder": "产业链企业", "actions": ["按项目梳理回款、应收账龄和商票到期日，进行现金流压力测试。", "复核客户集中度、订单与库存匹配，避免把行业情景直接当作企业预测。"], "indicators": ["应收账款周转天数", "经营现金流", "客户集中度"]},
+        {"stakeholder": "金融机构", "actions": ["区分房企、施工企业和供应商敞口，核验关联客户及重复担保。", "结合偿债现金流和抵押品复核进行多情景压力测试，不用网络中心性代替信用评级。"], "indicators": ["现金短债比", "逾期敞口", "抵押品覆盖率"]},
+        {"stakeholder": "高校与研究人员", "actions": ["对齐地区、行业、频率及现价口径；累计流量和存量分开处理。", "补充企业面板，进行平稳性与稳健性检验；样本内相关峰值不作为因果证据。"], "indicators": ["有效样本数", "缺失率", "时差相关", "价格平减口径"]},
+        {"stakeholder": "普通公众", "actions": ["核验项目交付、交易信息及家庭现金流，不据演示评分作买卖决定。", "区分行业研究结论与个人财务情况，必要时咨询专业人员。"], "indicators": ["家庭偿债负担", "现金储备", "交付信息"]},
+    ]
+    report["analysis_limitations"] = [context, "静态投入产出结果不是未来实际产出的预测；固定系数未考虑替代、产能约束与价格变化。", "风险评分是演示性指标，不是违约概率；案例只能提供机制线索，不能证明统一时滞。", "产业关联研究可在独立研究页运行，灰色关联及网络中心性不能替代价格模型。"]
+    return report
+
+
 def build_markdown(report: dict) -> str:
+    report = enrich_v2(dict(report))
     has_model = report.get("impact") is not None  # 是否有有效数量模型结果
     rs = report.get("risk_score")
     rs_s = f"{rs}" if isinstance(rs, (int, float)) else "未计算"
@@ -52,7 +74,7 @@ def build_markdown(report: dict) -> str:
         + (f"\n> 综合风险评分：**{rs_s} / 100（{report.get('risk_level', '')}）**  " if has_model else "")
         + f"\n> 生成时间：{report.get('created_at', '')}",
         "\n## 1. Executive Summary",
-        "\n" + report.get("summary", ""),
+        "\n" + (report.get("executive_summary") or report.get("summary", "")),
     ]
     if has_model:
         lines += [
@@ -117,6 +139,13 @@ def build_markdown(report: dict) -> str:
         lines += ["\n### 历史对比"]
         for c in report["similar_cases"]:
             lines.append(f"- **{c['title']}**：{c.get('peak_impact', '')} —— {c.get('lessons', '')}")
+            if c.get("source_url"):
+                lines.append(f"  - 资料链接：{c['source_url']}（需核验是否直接支持本案例的数值及时间窗口）")
+            if c.get("source_document"):
+                lines.append(f"  - 文档出处：{c['source_document']}")
+            if c.get("evidence_status"):
+                lines.append(f"  - 证据状态：{c['evidence_status']}")
+            lines.append("  - 证据边界：历史案例提供机制线索，不足以证明普遍因果关系或固定时滞。")
     lines += [
         "\n## 5. Model Explanation（模型依据）",
         "\n" + report.get("model_basis", ""),
@@ -135,6 +164,17 @@ def build_markdown(report: dict) -> str:
     lines += ["\n## 6. Conclusion（结论与建议关注指标）"]
     for k in report.get("key_indicators", []):
         lines.append(f"- {k}")
+    lines += ["\n## 7. 机制分析与验证边界"]
+    for item in report["mechanism_notes"]:
+        lines += [f"\n### {item['name']}", item["path"],
+                  f"- 验证指标：{'、'.join(item['indicators'])}", f"- 边界：{item['boundary']}"]
+    lines += ["\n## 8. 分主体行动建议（研究参考）"]
+    for item in report["stakeholder_recommendations"]:
+        lines.append(f"\n### {item['stakeholder']}")
+        lines.extend(f"- {action}" for action in item["actions"])
+        lines.append(f"- 关注指标：{'、'.join(item['indicators'])}")
+    lines += ["\n## 9. 局限与下一步"]
+    lines.extend(f"- {item}" for item in report["analysis_limitations"])
     lines += ["\n---\n*本报告由中国房地产产业链波动分析金融智能体自动生成（LLM Agent + 投入产出模型 + 风险评分模型 + RAG知识库），仅供研究演示，不构成投资建议。*"]
     return "\n".join(lines)
 

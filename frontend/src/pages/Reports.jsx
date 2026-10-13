@@ -6,6 +6,7 @@ import { apiUrl, listReports, getReport, deleteReport, deleteAllReports } from '
 export default function Reports() {
   const [list, setList] = useState([])
   const [selected, setSelected] = useState(null)
+  const [summaryOnly, setSummaryOnly] = useState(false)
 
   const load = () => listReports().then(r => setList(r.items)).catch(() => {})
   useEffect(() => { load() }, [])
@@ -72,14 +73,18 @@ export default function Reports() {
           <div className="lg:col-span-3 card report-body" id="reportArea">
             {selected ? (
               <>
-                <div className="flex gap-3 mb-5 no-print">
+                <div className="flex flex-wrap gap-3 mb-5 no-print">
+                  <button onClick={() => setSummaryOnly(value => !value)}
+                    className="text-xs px-3.5 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-200">
+                    {summaryOnly ? '查看完整报告' : '查看精简摘要'}
+                  </button>
                   <a href={apiUrl(`/api/report/${selected.report_id}/download`)}
                     className="text-xs px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors">下载 Markdown</a>
                   <button onClick={() => window.print()}
                     className="text-xs px-3.5 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-cyan-500 text-white shadow-lg shadow-blue-900/40 transition-all">导出 PDF</button>
                 </div>
                 <div className="report-body text-sm text-slate-300 leading-7"
-                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(_md(selected))) }} />
+                  dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(summaryOnly ? _summary(selected) : _md(selected))) }} />
               </>
             ) : (
               <div className="text-sm text-slate-500 h-40 flex flex-col items-center justify-center gap-3">
@@ -96,8 +101,15 @@ export default function Reports() {
   )
 }
 
+function _summary(report) {
+  const indicators = (report.key_indicators || []).slice(0, 5).map(item => `- ${item}`).join('\n')
+  const actions = (report.recommendations || []).slice(0, 3).map(item => `- ${item}`).join('\n')
+  return `# 产业链分析精简摘要\n\n**问题：** ${report.question || '—'}\n\n${report.executive_summary || report.summary || '暂无摘要'}\n\n## 核心指标\n${indicators || '暂无量化指标'}\n\n## 建议\n${actions || '详见完整报告的分主体建议'}\n\n> 仅供研究参考。相关性不是因果关系，演示评分不是违约概率。`
+}
+
 // 前端直接渲染 Markdown（与后端生成的 backend/reports/{id}.md 同源同构）
 function _md(report) {
+  if (report.markdown) return report.markdown
   // 安全格式化：缺失字段给定性描述而非 undefined
   const num = v => (typeof v === 'number' ? v.toLocaleString('zh-CN', { maximumFractionDigits: 1 }) : null)
   const pct = v => (typeof v === 'number' ? v.toFixed(2) : null)

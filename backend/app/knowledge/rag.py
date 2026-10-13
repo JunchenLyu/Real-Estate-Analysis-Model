@@ -1,4 +1,5 @@
 """Module 2: 金融知识库 RAG —— 文档切片 + Embedding + 向量检索（Chroma），带本地关键词降级方案"""
+import hashlib
 import json
 import re
 from pathlib import Path
@@ -95,6 +96,7 @@ def build_knowledge_base() -> dict:
                 "text": ch,
                 "source": f.name,
                 "category": _category_of(ch, f.name),
+                "content_hash": hashlib.sha256(ch.encode("utf-8")).hexdigest()[:16],
             })
 
     KB_CHUNKS_FILE.write_text(json.dumps(chunks, ensure_ascii=False), encoding="utf-8")
@@ -110,9 +112,13 @@ def build_knowledge_base() -> dict:
         # 嵌入模型变更或内容变化 → 重建向量库
         rebuild = col.count() != len(chunks)
         if not rebuild:
-            meta = col.get(limit=1).get("metadatas") or []
-            if meta and meta[0].get("embed") != _EMBED_NAME:
-                rebuild = True
+            stored = col.get()
+            metadata = dict(zip(stored.get("ids") or [], stored.get("metadatas") or []))
+            rebuild = any(
+                (metadata.get(c["id"]) or {}).get("embed") != _EMBED_NAME
+                or (metadata.get(c["id"]) or {}).get("content_hash") != c["content_hash"]
+                for c in chunks
+            )
         if rebuild:
             if col.count():
                 client.delete_collection("real_estate_kb")
@@ -126,7 +132,7 @@ def build_knowledge_base() -> dict:
                     ids=[c["id"] for c in batch],
                     documents=[c["text"] for c in batch],
                     metadatas=[{"source": c["source"], "category": c["category"],
-                                "embed": _EMBED_NAME} for c in batch],
+                                "embed": _EMBED_NAME, "content_hash": c["content_hash"]} for c in batch],
                 )
         _chroma_col = col
         status["vector_db"] = f"chroma ({col.count()} vectors, hybrid: {_EMBED_NAME} + bigram)"

@@ -3,6 +3,7 @@ import Home from './pages/Home.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import Upload from './pages/Upload.jsx'
 import Reports from './pages/Reports.jsx'
+import Research from './pages/Research.jsx'
 
 const NAV = [
   {
@@ -12,6 +13,10 @@ const NAV = [
   {
     to: '/dashboard', label: '风险仪表盘', desc: 'Dashboard',
     icon: <path d="M3 13h4v8H3zM10 9h4v12h-4zM17 5h4v16h-4z" />,
+  },
+  {
+    to: '/research', label: '产业关联研究', desc: 'V2 · 关联 / 网络 / 时差',
+    icon: <path d="M4 19V5m0 14h16M7 15l4-5 4 3 5-7" />,
   },
   {
     to: '/upload', label: '数据上传', desc: 'CSV / Excel',
@@ -63,6 +68,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/research" element={<Research />} />
           <Route path="/upload" element={<Upload />} />
           <Route path="/reports" element={<Reports />} />
         </Routes>

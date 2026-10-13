@@ -17,6 +17,7 @@ from .models import input_output as io
 from .services import upload as upload_svc
 from .services import report as report_svc
 from .services import store
+from .services.research import router as research_router
 
 STATE = {"reports": {}, "uploads": {}, "dashboard": {}}
 AGENT = RiskAgent()
@@ -77,6 +78,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="中国房地产产业链波动分析金融智能体", version="1.4.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+app.include_router(research_router)
 
 
 class ChatRequest(BaseModel):
@@ -304,7 +306,9 @@ def list_reports():
 def get_report(rid: str):
     if rid not in STATE["reports"]:
         raise HTTPException(404, "报告不存在（服务重启后内存态清空，Markdown 文件仍在 backend/reports/）")
-    return STATE["reports"][rid]
+    report = report_svc.enrich_v2(dict(STATE["reports"][rid]))
+    report["markdown"] = report_svc.build_markdown(report)
+    return report
 
 
 # ---------- 报告删除 ----------
@@ -335,6 +339,8 @@ def delete_all_reports():
 def download_report(rid: str):
     from .config import REPORTS_DIR
     path = REPORTS_DIR / f"{rid}.md"
+    if rid in STATE["reports"]:
+        report_svc.save_report(STATE["reports"][rid])
     if not path.exists():
         raise HTTPException(404, "报告文件不存在")
     return FileResponse(path, media_type="text/markdown",

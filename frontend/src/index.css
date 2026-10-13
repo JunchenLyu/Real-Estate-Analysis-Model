@@ -157,4 +157,11 @@ body {
   /* 表格允许跨页断行 */
   .report-body table { page-break-inside: auto; }
   .report-body tr { page-break-inside: avoid; }
+  .research-page { padding: 0 !important; }
+  .research-page p, .research-page h1, .research-page h2,
+  .research-page th, .research-page td { color: #111 !important; }
+  .research-page > .grid { display: block !important; }
+  .research-page .grid > .card { margin-bottom: 20px; }
+  .research-page table { page-break-inside: auto; }
+  .research-page tr { page-break-inside: avoid; }
 }
