@@ -81,7 +81,7 @@ def build_markdown(report: dict) -> str:
     rs = report.get("risk_score")
     rs_s = f"{rs}" if isinstance(rs, (int, float)) else "未计算"
     lines = [
-        "# 中国房地产产业链波动分析报告",
+        "# 中国房地产产业链波动传导分析报告",
         f"\n> 分析问题：**{report.get('question', '')}**  "
         + (f"\n> 综合风险评分：**{rs_s} / 100（{report.get('risk_level', '')}）**  " if has_model else "")
         + f"\n> 生成时间：{report.get('created_at', '')}",
@@ -190,7 +190,7 @@ def build_markdown(report: dict) -> str:
     lines.append(f"\n> {report['strategy_disclaimer']}")
     lines += ["\n## 9. 局限与下一步"]
     lines.extend(f"- {item}" for item in report["analysis_limitations"])
-    lines += ["\n---\n*本报告由中国房地产产业链波动分析金融智能体自动生成（LLM Agent + 投入产出模型 + 风险评分模型 + RAG知识库），仅供研究演示，不构成投资建议。*"]
+    lines += ["\n---\n*本报告由中国房地产产业链波动传导分析金融智能体自动生成（LLM Agent + 投入产出模型 + 风险评分模型 + RAG知识库），仅供研究演示，不构成投资建议。*"]
     return "\n".join(lines)
 
 
@@ -206,7 +206,7 @@ def build_brief_markdown(report: dict) -> str:
     impacts = (report.get("affected_industries") or [])[:5]
     mechanisms = report["mechanism_notes"][:3]
     lines = [
-        "# 中国房地产产业链波动分析精简摘要",
+        "# 中国房地产产业链波动传导分析精简摘要",
         f"\n**问题：** {report.get('question', '—')}",
         f"\n{report.get('executive_summary') or report.get('summary') or '暂无摘要'}",
     ]
@@ -287,7 +287,7 @@ def build_pdf(report: dict, path: str | Path, brief: bool = False) -> str:
     document = SimpleDocTemplate(str(path), pagesize=A4, rightMargin=18 * mm, leftMargin=18 * mm,
                                  topMargin=(14 if brief else 16) * mm,
                                  bottomMargin=(14 if brief else 16) * mm,
-                                 title="中国房地产产业链波动分析报告")
+                                 title="中国房地产产业链波动传导分析报告")
     story = []
     markdown = build_brief_markdown(report) if brief else build_markdown(report)
     lines = markdown.splitlines()

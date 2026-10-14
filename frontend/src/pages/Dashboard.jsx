@@ -188,7 +188,7 @@ export default function Dashboard() {
           </div>
 
           <div className="card card-hover anim-fade-up">
-            <div className="section-label mb-3">历史案例对标</div>
+            <div className="section-label mb-3">国外历史案例对标</div>
             {data.similar_cases?.length ? (
               <div className="space-y-3">
                 {data.similar_cases.map((c, i) => (
@@ -312,6 +312,6 @@ const Empty = () => (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" className="w-10 h-10 opacity-50">
       <path d="M3 13h4v8H3zM10 9h4v12h-4zM17 5h4v16h-4z" />
     </svg>
-    暂无数据 —— 在「智能问答」输入 "分析房地产投资下降15%的影响" 后自动更新
+    暂无数据 —— 在「智能问答」输入“房地产投资额下降15%对房地产产业链相关行业有什么影响？”后自动更新
   </div>
 )

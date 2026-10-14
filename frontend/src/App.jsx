@@ -11,7 +11,7 @@ import Strategy from './pages/Strategy.jsx'
 
 const NAV = [
   {
-    to: '/', label: '首页', desc: '项目与智能问答',
+    to: '/', label: '首页', desc: '项目名称及简介',
     icon: <path d="M8 10h8M8 14h5M21 12a9 9 0 1 1-4.4-7.7L21 3l-1 3.6A8.96 8.96 0 0 1 21 12Z" />,
   },
   {
@@ -45,8 +45,8 @@ export default function App() {
     <div className="flex h-screen flex-col lg:flex-row">
       <aside className="no-print w-60 shrink-0 border-r border-slate-800/70 bg-[#070c17] hidden lg:flex flex-col">
         <div className="p-5 border-b border-slate-800/70">
-          <div className="text-gradient text-2xl font-extrabold leading-tight tracking-tight">RE Risk</div>
-          <div className="text-slate-500 text-xs mt-1.5 leading-5">房地产产业链风险<br />智能分析平台</div>
+          <div className="text-gradient text-sm font-bold leading-5">中国房地产产业链波动传导分析金融智能体</div>
+          <div className="text-slate-500 text-[11px] mt-1.5 leading-5">RE Transmission Analysis Agent</div>
         </div>
         <nav className="flex-1 p-3 space-y-1.5">
           {NAV.map(n => (

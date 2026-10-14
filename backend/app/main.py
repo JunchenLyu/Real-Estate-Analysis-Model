@@ -1,4 +1,4 @@
-"""中国房地产产业链波动分析金融智能体 —— FastAPI 入口"""
+"""中国房地产产业链波动传导分析金融智能体 —— FastAPI 入口"""
 import json
 import uuid
 from contextlib import asynccontextmanager
@@ -77,7 +77,7 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="中国房地产产业链波动分析金融智能体", version="2.0.0", lifespan=lifespan)
+app = FastAPI(title="中国房地产产业链波动传导分析金融智能体", version="2.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(research_router)
 app.include_router(v2_router)
@@ -353,7 +353,7 @@ def download_report(rid: str):
     if not path.exists():
         raise HTTPException(404, "报告文件不存在")
     return FileResponse(path, media_type="text/markdown",
-                        filename=f"中国房地产产业链波动分析报告_{rid}.md")
+                        filename=f"中国房地产产业链波动传导分析报告_{rid}.md")
 
 
 @app.get("/api/report/{rid}/pdf")
@@ -365,7 +365,7 @@ def download_report_pdf(rid: str, brief: bool = False):
     report_svc.build_pdf(STATE["reports"][rid], path, brief=brief)
     label = "精简摘要" if brief else "完整报告"
     return FileResponse(path, media_type="application/pdf",
-                        filename=f"中国房地产产业链波动分析{label}_{rid}.pdf")
+                        filename=f"中国房地产产业链波动传导分析{label}_{rid}.pdf")
 
 
 # ---------- 知识库演示接口 ----------

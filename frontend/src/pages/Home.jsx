@@ -10,7 +10,7 @@ const MODE_OPTIONS = [
 ]
 
 const SUGGESTIONS = [
-  '分析房地产投资下降15%的影响',
+  '房地产投资额下降15%对房地产产业链相关行业有什么影响？其风险传导路径是什么？需要提前关注那些指标？各相关方应采取什么样的策略？',
   '房价下跌20%会对哪些行业造成冲击？',
   '房地产销售下滑对家电家具产业链的传导路径',
 ]
@@ -123,7 +123,7 @@ export default function Home() {
     <div className="h-full flex flex-col">
       <header className="px-8 py-5 border-b border-slate-800/70 flex items-center justify-between shrink-0">
         <div>
-          <h1 className="text-xl font-bold text-slate-100 tracking-tight">房地产产业链风险智能分析</h1>
+          <h1 className="text-xl font-bold text-slate-100 tracking-tight">中国房地产产业链波动传导分析金融智能体</h1>
           <div className="flex items-center gap-2 mt-1">
             <span className={`glow-dot ${health ? '' : '!bg-amber-400'}`} />
             <p className="text-xs text-slate-500">
@@ -196,9 +196,9 @@ export default function Home() {
                   </svg>
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-slate-100 font-semibold">您好，我是产业链风险分析智能体</h2>
+                  <h2 className="text-slate-100 font-semibold">中国房地产产业链波动传导分析金融智能体</h2>
                   <p className="text-slate-400 text-sm leading-7 mt-1.5">
-                    输入房地产相关问题（如冲击情景），我将自动规划并调用
+                    本项目面向中国房地产产业链波动研究。输入房地产相关问题（如冲击情景），智能体将自动规划并调用
                     <span className="text-blue-400"> 知识库检索 </span>/
                     <span className="text-blue-400"> 投入产出模型 </span>/
                     <span className="text-blue-400"> 风险评分 </span>/
@@ -297,7 +297,7 @@ export default function Home() {
         <div className="flex gap-3">
           <input value={input} onChange={e => setInput(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && send()}
-            placeholder="输入问题，例如：分析房地产投资下降15%的影响"
+            placeholder="输入问题，例如：房地产投资额下降15%对房地产产业链相关行业有什么影响？"
             className="input-glow flex-1 rounded-xl px-4 py-3 text-sm placeholder:text-slate-600" />
           <button onClick={() => send()} disabled={loading}
             className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-50 disabled:hover:from-blue-600 rounded-xl px-7 text-sm font-medium shadow-lg shadow-blue-900/40 transition-all">
@@ -331,7 +331,7 @@ function ReportView({ report }) {
     <div className="card max-w-3xl w-full space-y-6">
       <div className="flex items-start justify-between gap-4 pb-4 border-b border-slate-800/70">
         <div>
-          <h3 className="text-gradient font-semibold text-lg">产业链波动分析报告</h3>
+          <h3 className="text-gradient font-semibold text-lg">中国房地产产业链波动传导分析结论</h3>
           <p className="text-[11px] text-slate-500 mt-1">由 Agent 自动生成 · 模式 {agent_mode || '-'}</p>
         </div>
         <div className="text-right shrink-0">

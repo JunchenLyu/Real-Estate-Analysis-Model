@@ -44,6 +44,20 @@ class BugRegressions(unittest.TestCase):
                        io.analyze_shock(0)):
             self.assertFalse(result.get("transmission_stages"))
 
+    def test_demand_report_path_matches_question_subject(self):
+        agent = RiskAgent()
+        sales, _ = agent._rule_run("房地产销售额下降15%对建筑业有什么影响？", {})
+        self.assertIn("房地产销售额下降", sales["summary"])
+        self.assertIn("房企回款承压", sales["summary"])
+        self.assertNotIn("房地产投资收缩", sales["summary"])
+        self.assertTrue(any("建筑业新签订单" in step for step in sales["transmission_path"]))
+        self.assertIn("房地产销售额下降15%", sales["transmission_path"][1])
+
+        investment, _ = agent._rule_run("房地产投资额下降15%对产业链有什么影响？", {})
+        self.assertIn("房地产投资额下降", investment["summary"])
+        self.assertIn("建筑施工活动", investment["summary"])
+        self.assertIn("房地产投资额下降15%", investment["transmission_path"][1])
+
     def test_no_llm_invented_scores(self):
         for question in ("房地产投资下降10%", "房价下降10%", "房地产风险有哪些？"):
             self.assertFalse(check_tool_allowed("compute_risk_score", question)[0])

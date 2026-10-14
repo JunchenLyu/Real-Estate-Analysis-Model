@@ -10,7 +10,7 @@ from ..knowledge import rag
 from ..models import input_output as io
 from ..models import risk as risk_model
 
-SYSTEM_PROMPT = """你是「中国房地产产业链波动分析金融智能体」，一名资深房地产金融风险分析师。
+SYSTEM_PROMPT = """你是「中国房地产产业链波动传导分析金融智能体」，一名资深房地产金融风险分析师。
 
 ## 工作准则
 1. 回答任何金融问题前，必须优先调用 search_knowledge_base 检索知识库获取依据。
@@ -694,6 +694,32 @@ def _compose_report(question, kb, impact, industry_scores, agg, similar_cases, u
                 "若持续：成本推动型通胀压力沿产业链向终端消费传导",
             ]
         else:
+            shock_pct, shock_direction, _ = _parse_shock(question)
+            shock_phrase = f"{shock_direction}{shock_pct:g}%"
+            if "销售" in question:
+                demand_path = (
+                    "房地产销售额下降 → 房企回款承压 → 拿地、新开工与施工需求放缓 → "
+                    "建筑业及上游订单回落，并通过信用与现金流渠道放大"
+                )
+                transmission = [
+                    f"房地产销售额{shock_phrase}，房企回款与资金周转承压",
+                    "开发投资与新开工调整：建筑业新签订单、施工进度和工程回款承压",
+                    "上游需求收缩：钢铁、建材、化工和机械设备订单回落",
+                    "下游后周期承压：竣工与交付变化向家电、家具需求传导",
+                    "金融传导：房企现金流与信用风险暴露，银行敞口和抵押品渠道放大波动",
+                ]
+            else:
+                demand_path = (
+                    "房地产投资额下降 → 建筑施工活动和新开工需求放缓 → "
+                    "上游原材料与设备订单下降 → 下游后周期需求承压，并通过信用与现金流渠道放大"
+                )
+                transmission = [
+                    f"房地产投资额{shock_phrase}，直接冲击房地产与建筑业",
+                    "建筑施工与新开工放缓：工程订单、施工进度与工程回款承压",
+                    "上游需求收缩：钢铁、建材、化工和机械设备订单下降",
+                    "下游后周期承压：竣工与交付变化向家电、家具需求传导",
+                    "金融传导：房企现金流与信用风险暴露，银行敞口和抵押品渠道放大波动",
+                ]
             summary = (
                 f"针对「{question}」：基于13部门投入产出模型（2023年全国211部门表聚合）测算，"
                 f"本情景设定为「{impact['scenario']}」，"
@@ -701,27 +727,18 @@ def _compose_report(question, kb, impact, industry_scores, agg, similar_cases, u
                 f"（占全国13部门基准总产出 {abs(impact['total_output_change_pct'])}%）。"
                 f"受影响最大的行业依次为：{top_desc}。"
                 f"综合风险评分 {agg['risk_score']}（{agg['risk_level']}）。"
-                f"传导路径为：房地产投资收缩 → 上游原材料需求下降 → 中游建造活动放缓 → 下游耐用品消费承压，"
-                f"并通过金融渠道放大。该结果为需求侧投入关联的情景测算，"
+                f"传导路径为：{demand_path}。该结果为需求侧投入关联的情景测算，"
                 f"不解释为全国各行业实际产出变化的确定性预测。"
             )
             model_basis = (f"列昂惕夫投入产出模型 X=(I-A)^(-1)Y：房地产乘数 {impact['real_estate_multiplier']}、"
                            f"建筑业乘数 {impact['construction_multiplier']}；冲击情景：{impact['scenario']}")
-            transmission = [
-                f"房地产最终需求{impact['scenario'].split('最终需求')[-1]}，直接冲击房地产与建筑业",
-                "上游需求收缩：钢铁、建材、化工订单下降（生产成本渠道）",
-                "中游放缓：机械设备、专业服务、建筑装饰活动减少",
-                "下游承压：家电、家具等后周期消费需求下滑（收入-消费渠道）",
-                "金融传导：房企信用风险暴露，银行敞口与抵押品价值承压（金融加速器渠道）",
-            ]
         if impact.get("total_output_change_yi", 0) > 0:
             summary += " 本情景为数量扩张而非收缩，传导方向应按投入增加及关联需求增长理解。"
             transmission = ["初始投入增加" if is_ghosh else "房地产与建筑业最终需求增加",
                             "产业关联投入及需求增加", "上下游产出情景扩张（非实际产出预测）"]
             summary = summary.replace("供给收缩 → 中间投入成本上升 → 下游生产受阻", "初始投入增加 → 中间投入传导 → 下游产出扩张")
             summary = summary.replace("本情景属于供给约束型冲击", "本情景属于供给扩张情景")
-            summary = summary.replace("房地产投资收缩 → 上游原材料需求下降 → 中游建造活动放缓 → 下游耐用品消费承压",
-                                      "房地产投资增加 → 上游关联需求增长 → 中下游活动扩张")
+            summary = summary.replace(demand_path, "房地产与建筑业最终需求增加 → 上游关联需求增长 → 中下游活动扩张")
         # 传导三阶段预判（需求侧：六案例归纳框架；供给侧：供给约束传导框架）
         stages = impact.get("transmission_stages", {})
         if stages:
