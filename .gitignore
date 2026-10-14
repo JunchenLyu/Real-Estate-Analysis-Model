@@ -14,6 +14,9 @@ venv/
 backend/uploads/
 backend/reports/
 backend/app/data/app.db*
+.runtime/
+/output/
+/tmp/
 *.log
 
 # 演示录屏等大文件不入库
