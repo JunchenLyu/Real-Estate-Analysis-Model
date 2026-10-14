@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { api } from '../api.js'
+import { getV2Overview } from '../api.js'
 import Chart from '../components/Chart.jsx'
 
 const defaults = { reference: '房屋新开工面积当月同比', target: '水泥产量当月同比', rho: 0.5, max_lag: 12, window: 24 }
 
 function exportResult(data) {
-  const text = `# 产业关联研究结果\n\n> ${data.scope}\n\n来源：${data.metadata.source_file}\n\n口径：${data.metadata.processing}\n\n## 分析参数\n\n${JSON.stringify(data.parameters)}\n\n## 灰色关联排序\n\n|指标|关联度|\n|---|---|\n${data.grey.ranking.map(r => `|${r.name}|${r.grade}|`).join('\n')}\n\n共同样本：${data.grey.sample_count}，${data.grey.start} 至 ${data.grey.end}\n\n## 时差相关\n\n${data.lag.lag_definition}\n\n|时差（月）|相关系数|有效样本|\n|---|---|---|\n${data.lag.lags.map(r => `|${r.lag_months}|${r.correlation ?? '不可计算'}|${r.sample_count}|`).join('\n')}\n\n## 北京子网络中心性\n\n来源：${JSON.stringify(data.network.source)}\n\n|行业|入强度|出强度|PageRank|\n|---|---|---|---|\n${data.network.ranking.map(r => `|${r.name}|${r.in_strength}|${r.out_strength}|${r.pagerank}|`).join('\n')}\n\n## 方法与局限\n\n${[data.grey.method, data.lag.method, data.network.method, ...data.metadata.warnings, ...data.grey.warnings, ...data.lag.warnings, ...data.network.warnings].map(w => `- ${w}`).join('\n')}\n\n数据校验指纹：${data.metadata.sha256}\n`
+  const text = `# 产业关联研究结果\n\n> ${data.scope}\n\n来源：${data.metadata.source_file}\n\n口径：${data.metadata.processing}\n\n## 分析参数\n\n${JSON.stringify(data.parameters)}\n\n## 灰色关联排序\n\n|指标|关联度|\n|---|---|\n${data.grey.ranking.map(r => `|${r.name}|${r.grade}|`).join('\n')}\n\n共同样本：${data.grey.sample_count}，${data.grey.start} 至 ${data.grey.end}\n\n## 时差相关\n\n${data.lag.lag_definition}\n\n|时差（月）|相关系数|有效样本|\n|---|---|---|\n${data.lag.lags.map(r => `|${r.lag_months}|${r.correlation ?? '不可计算'}|${r.sample_count}|`).join('\n')}\n\n## 全国投入产出子网络中心性\n\n来源：${JSON.stringify(data.network.source)}\n\n|行业|入强度|出强度|PageRank|\n|---|---|---|---|\n${data.network.ranking.map(r => `|${r.name}|${r.in_strength}|${r.out_strength}|${r.pagerank}|`).join('\n')}\n\n## 方法与局限\n\n${[data.grey.method, data.lag.method, data.network.method, ...data.metadata.warnings, ...data.grey.warnings, ...data.lag.warnings, ...data.network.warnings].map(w => `- ${w}`).join('\n')}\n\n数据校验指纹：${data.metadata.sha256}\n`
   const url = URL.createObjectURL(new Blob([text], { type: 'text/markdown;charset=utf-8' }))
   const link = document.createElement('a')
   link.href = url
@@ -20,6 +22,7 @@ export default function Research() {
   const [result, setResult] = useState(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [overview, setOverview] = useState(null)
   useEffect(() => {
     let active = true
     api.get('/api/research/catalog').then(r => {
@@ -30,6 +33,7 @@ export default function Research() {
     }).catch(e => { if (active) setError(e.response?.data?.detail || e.message) })
     return () => { active = false }
   }, [])
+  useEffect(() => { getV2Overview().then(setOverview).catch(() => {}) }, [])
   const update = (key, value) => {
     setForm(prev => ({ ...prev, [key]: value }))
     setResult(null)
@@ -51,10 +55,11 @@ export default function Research() {
   return (
     <div className="research-page p-8 space-y-6 max-w-7xl mx-auto">
       <header className="flex flex-wrap items-center justify-between gap-3">
-        <div><h1 className="text-xl font-bold">产业关联研究</h1><p className="text-xs text-slate-500 mt-2">V2 实验模块 · 灰色关联 / 投入产出网络 / 动态时差</p></div>
-        {result && <div className="flex gap-3 no-print"><button className="text-sm text-blue-300" onClick={() => exportResult(result)}>导出研究结果</button><button className="text-sm text-blue-300" onClick={() => window.print()}>打印 / 另存 PDF</button></div>}
+        <div><h1 className="text-xl font-bold">静态传导结果</h1><p className="text-xs text-slate-500 mt-2">Leontief / Ghosh / 灰色关联 / 投入产出网络</p></div>
+        <div className="flex gap-4 no-print"><Link className="text-sm text-blue-300" to="/dashboard">查看风险仪表盘</Link>{result && <><button className="text-sm text-blue-300" onClick={() => exportResult(result)}>导出研究结果</button><button className="text-sm text-blue-300" onClick={() => window.print()}>打印 / 另存 PDF</button></>}</div>
       </header>
-      <div className="card text-sm text-amber-200 leading-6">本页为描述性研究，不参与风险评分。全国月度指标与北京13部门子网络分别展示，不混合计算；相关性、灰色关联度和中心性均不代表因果传导。</div>
+      <div className="card !rounded-lg text-sm text-amber-200 leading-6">本页为描述性研究，不参与风险评分。全国月度指标与全国13部门子网络分别展示，时序与网络不混合计算；相关性、灰色关联度和中心性均不代表因果传导。</div>
+      {overview && <div className="grid grid-cols-1 md:grid-cols-5 gap-2">{overview.models.map(model => <div key={model.id} className="border border-slate-800 rounded-lg p-3"><div className="text-xs text-slate-200">{model.name}</div><div className={`text-[11px] mt-1 ${model.status === '可运行' ? 'text-emerald-300' : 'text-amber-300'}`}>{model.status}</div><div className="text-[11px] text-slate-600 mt-2 leading-4">{model.boundary}</div></div>)}</div>}
       {error && <div role="alert" className="card text-red-300">{error}</div>}
       {!catalog && !error && <p className="text-slate-400">正在读取研究数据…</p>}
       {catalog && <>
@@ -77,7 +82,7 @@ export default function Research() {
           <div className="card"><h2 className="section-label">时差相关扫描 · 不自动确认传导时滞</h2><p className="text-xs text-slate-500 mt-2">{result.lag.lag_definition}</p><Chart option={{ ...chartBase, xAxis: { type: 'category', data: result.lag.lags.map(r => r.lag_months), name: '月' }, yAxis: { type: 'value', min: -1, max: 1 }, series: [{ name: 'Pearson相关系数', type: 'line', data: result.lag.lags.map(r => r.correlation), connectNulls: false }] }} /><p className="text-xs text-slate-400">样本内最大绝对相关：{result.lag.strongest_absolute_correlation ? `${result.lag.strongest_absolute_correlation.lag_months}月，r=${result.lag.strongest_absolute_correlation.correlation}，n=${result.lag.strongest_absolute_correlation.sample_count}` : '样本不足或序列恒定'}</p></div>
         </div>
         <div className="card"><h2 className="section-label">同步滚动相关（{result.lag.window_months}个日历月窗口）</h2><Chart option={{ ...chartBase, xAxis: { type: 'category', data: result.lag.rolling.map(r => r.month), axisLabel: { rotate: 40 } }, yAxis: { type: 'value', min: -1, max: 1 }, series: [{ type: 'line', data: result.lag.rolling.map(r => r.correlation), connectNulls: false, showSymbol: false }] }} /></div>
-        <div className="card"><h2 className="section-label">北京投入产出子网络 · {result.network.node_count}节点 / {result.network.edge_count}条非零边</h2><p className="text-xs text-slate-400 my-3">{result.network.edge_direction}。PageRank反映该方向的网络中心性，不是风险概率。</p><p className="text-xs text-slate-500 mb-3">来源：{result.network.source.source} · {result.network.source.year}；{result.network.source.note}</p><table className="w-full text-sm text-left"><thead className="text-slate-500"><tr><th>行业</th><th>入强度</th><th>出强度</th><th>PageRank</th></tr></thead><tbody>{result.network.ranking.map(r => <tr key={r.name} className="border-t border-slate-800"><td className="py-2">{r.name}</td><td>{r.in_strength}</td><td>{r.out_strength}</td><td className="text-cyan-300">{r.pagerank}</td></tr>)}</tbody></table></div>
+        <div className="card"><h2 className="section-label">全国投入产出子网络 · {result.network.node_count}节点 / {result.network.edge_count}条非零边</h2><p className="text-xs text-slate-400 my-3">{result.network.edge_direction}。PageRank反映该方向的网络中心性，不是风险概率。</p><p className="text-xs text-slate-500 mb-3">来源：{result.network.source.source}；{result.network.source.note}</p><table className="w-full text-sm text-left"><thead className="text-slate-500"><tr><th>行业</th><th>入强度</th><th>出强度</th><th>PageRank</th></tr></thead><tbody>{result.network.ranking.map(r => <tr key={r.name} className="border-t border-slate-800"><td className="py-2">{r.name}</td><td>{r.in_strength}</td><td>{r.out_strength}</td><td className="text-cyan-300">{r.pagerank}</td></tr>)}</tbody></table></div>
         <div className="card text-xs text-slate-400 leading-6"><h2 className="section-label mb-3">方法与解释边界</h2>{[result.grey.method, result.lag.method, result.network.method, ...result.grey.warnings, ...result.lag.warnings, ...result.network.warnings].map(w => <p key={w}>{w}</p>)}</div>
       </>}
     </div>

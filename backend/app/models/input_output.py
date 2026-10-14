@@ -130,10 +130,8 @@ def ghosh_supply_shock(shock_sector: str, shock_percent: float, direction: str =
     （B 的行和不要求等于 1；与直接消耗矩阵的关系：B = D⁻¹AD，相似矩阵
     谱半径相同 ρ(B)=ρ(A)<1，因此 (I-B) 可正常求逆。）
 
-    口径提示：地区投入产出表的中间使用含跨地区调入/进口
-    （行平衡：中间使用 + 最终使用 - 进口 = 总产出），
-    故 B 不宜解释为"北京市本地产出的分配比例"，
-    而应作为"各下游部门对该产品的中间使用暴露与产业关联强度指标"。
+    口径提示：竞争型投入产出表包含进口中间品，B 应解释为各下游部门
+    对该产品的中间使用暴露与产业关联强度指标，而不是企业销售预测。
     """
     if shock_sector not in SECTOR_NAMES:
         return {"error": f"未知部门: {shock_sector}"}
@@ -176,9 +174,9 @@ def ghosh_supply_shock(shock_sector: str, shock_percent: float, direction: str =
         "construction_multiplier": round(impact_multiplier(A, SECTOR_NAMES.index("建筑业")), 2),
         "supply_multiplier": round(supply_mult, 2),
         "note": "标准Ghosh口径（B=D⁻¹Z，按卖方部门总产出系数化，与A相似故谱半径相同可稳定求逆）。"
-                "地区表中间使用含跨地区调入/进口，B反映各下游部门对该产品的中间使用暴露强度，"
-                "非本地产出的销售分配比例；测算结果应解读为供给侧投入压力沿产业链传导的情景值，"
-                "而非对北京市各行业实际产出变化的确定性预测",
+                "竞争型投入产出表包含进口中间品，B反映各下游部门对该产品的中间使用暴露强度；"
+                "测算结果应解读为供给侧投入压力沿产业链传导的情景值，"
+                "而非对全国各行业实际产出变化的确定性预测",
     }
 
 

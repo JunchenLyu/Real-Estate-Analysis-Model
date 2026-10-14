@@ -31,11 +31,11 @@ export default function Reports() {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-5 md:p-8 space-y-6">
       <header className="flex items-center justify-between no-print">
         <div>
           <h1 className="text-xl font-bold tracking-tight">报告中心</h1>
-          <p className="text-xs text-slate-500 mt-1">结构化金融分析报告（Markdown 持久化 / 浏览器导出 PDF）</p>
+          <p className="text-xs text-slate-500 mt-1">结构化金融分析报告（完整报告 / 精简摘要 / PDF 直下载）</p>
         </div>
         {list.length > 0 && (
           <button onClick={delAll}
@@ -49,10 +49,10 @@ export default function Reports() {
         <div className="card text-sm text-slate-500 anim-fade-up">暂无报告 —— 在「智能问答」完成一次分析后自动生成。</div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          <div className="space-y-2 no-print">
+          <div className="flex gap-2 overflow-x-auto pb-2 lg:block lg:space-y-2 lg:overflow-visible lg:pb-0 no-print">
             {list.map((r, i) => (
               <div key={r.report_id}
-                className={`group relative card card-hover !p-3.5 anim-fade-up cursor-pointer transition-colors ${
+                className={`group relative card card-hover !p-3.5 anim-fade-up cursor-pointer transition-colors w-72 shrink-0 lg:w-auto ${
                   selected?.report_id === r.report_id ? '!border-blue-500/60 shadow-[0_0_16px_rgba(59,130,246,0.15)]' : ''}`}
                 style={{ animationDelay: `${i * 40}ms` }}
                 onClick={() => open(r.report_id)}>
@@ -64,7 +64,7 @@ export default function Reports() {
                 </div>
                 <button onClick={e => { e.stopPropagation(); del(r.report_id) }}
                   title="删除此报告"
-                  className="absolute top-2.5 right-2.5 w-6 h-6 rounded-md flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-950/50 opacity-0 group-hover:opacity-100 transition-all text-sm leading-none">
+                  className="absolute top-2.5 right-2.5 w-6 h-6 rounded-md flex items-center justify-center text-slate-600 hover:text-red-400 hover:bg-red-950/50 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-all text-sm leading-none">
                   ✕
                 </button>
               </div>
@@ -80,8 +80,8 @@ export default function Reports() {
                   </button>
                   <a href={apiUrl(`/api/report/${selected.report_id}/download`)}
                     className="text-xs px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 transition-colors">下载 Markdown</a>
-                  <button onClick={() => window.print()}
-                    className="text-xs px-3.5 py-2 rounded-lg bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-500 hover:to-cyan-500 text-white shadow-lg shadow-blue-900/40 transition-all">导出 PDF</button>
+                  <a href={apiUrl(`/api/report/${selected.report_id}/pdf?brief=${summaryOnly}`)}
+                    className="text-xs px-3.5 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white transition-colors">下载 {summaryOnly ? '摘要' : '完整'} PDF</a>
                 </div>
                 <div className="report-body text-sm text-slate-300 leading-7"
                   dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(marked.parse(summaryOnly ? _summary(selected) : _md(selected))) }} />
@@ -102,6 +102,7 @@ export default function Reports() {
 }
 
 function _summary(report) {
+  if (report.brief_markdown) return report.brief_markdown
   const indicators = (report.key_indicators || []).slice(0, 5).map(item => `- ${item}`).join('\n')
   const actions = (report.recommendations || []).slice(0, 3).map(item => `- ${item}`).join('\n')
   return `# 产业链分析精简摘要\n\n**问题：** ${report.question || '—'}\n\n${report.executive_summary || report.summary || '暂无摘要'}\n\n## 核心指标\n${indicators || '暂无量化指标'}\n\n## 建议\n${actions || '详见完整报告的分主体建议'}\n\n> 仅供研究参考。相关性不是因果关系，演示评分不是违约概率。`

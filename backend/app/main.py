@@ -18,6 +18,7 @@ from .services import upload as upload_svc
 from .services import report as report_svc
 from .services import store
 from .services.research import router as research_router
+from .services.v2 import router as v2_router
 
 STATE = {"reports": {}, "uploads": {}, "dashboard": {}}
 AGENT = RiskAgent()
@@ -76,9 +77,10 @@ async def lifespan(app: FastAPI):
     yield
 
 
-app = FastAPI(title="中国房地产产业链波动分析金融智能体", version="1.4.0", lifespan=lifespan)
+app = FastAPI(title="中国房地产产业链波动分析金融智能体", version="2.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 app.include_router(research_router)
+app.include_router(v2_router)
 
 
 class ChatRequest(BaseModel):
@@ -102,6 +104,7 @@ def chat(req: ChatRequest):
     report["tool_trace"] = trace
     report["agent_mode"] = AGENT.mode
     report["report_id"] = str(uuid.uuid4())[:8]
+    report = report_svc.enrich_v2(report)
     STATE["reports"][report["report_id"]] = report
     report_svc.save_report(report)
     store.save_report(report)  # SQLite 持久化
@@ -132,6 +135,7 @@ def chat_stream(q: str):
                     report["agent_mode"] = AGENT.mode
                     report["tool_trace"] = trace
                     report["report_id"] = str(uuid.uuid4())[:8]
+                    report = report_svc.enrich_v2(report)
                     report_svc.save_report(report)
                     store.save_report(report)
                     STATE["reports"][report["report_id"]] = report
@@ -308,6 +312,7 @@ def get_report(rid: str):
         raise HTTPException(404, "报告不存在（服务重启后内存态清空，Markdown 文件仍在 backend/reports/）")
     report = report_svc.enrich_v2(dict(STATE["reports"][rid]))
     report["markdown"] = report_svc.build_markdown(report)
+    report["brief_markdown"] = report_svc.build_brief_markdown(report)
     return report
 
 
@@ -319,6 +324,8 @@ def delete_report(rid: str):
     STATE["reports"].pop(rid)
     store.delete_report(rid)
     (REPORTS_DIR / f"{rid}.md").unlink(missing_ok=True)
+    (REPORTS_DIR / f"{rid}.pdf").unlink(missing_ok=True)
+    (REPORTS_DIR / f"{rid}_brief.pdf").unlink(missing_ok=True)
     _rebuild_dashboard()
     return {"deleted": rid}
 
@@ -329,6 +336,8 @@ def delete_all_reports():
     ids = list(STATE["reports"].keys())
     for rid in ids:
         (REPORTS_DIR / f"{rid}.md").unlink(missing_ok=True)
+        (REPORTS_DIR / f"{rid}.pdf").unlink(missing_ok=True)
+        (REPORTS_DIR / f"{rid}_brief.pdf").unlink(missing_ok=True)
     STATE["reports"].clear()
     store.clear_reports()
     _rebuild_dashboard()
@@ -345,6 +354,18 @@ def download_report(rid: str):
         raise HTTPException(404, "报告文件不存在")
     return FileResponse(path, media_type="text/markdown",
                         filename=f"中国房地产产业链波动分析报告_{rid}.md")
+
+
+@app.get("/api/report/{rid}/pdf")
+def download_report_pdf(rid: str, brief: bool = False):
+    if rid not in STATE["reports"]:
+        raise HTTPException(404, "报告不存在")
+    suffix = "_brief" if brief else ""
+    path = REPORTS_DIR / f"{rid}{suffix}.pdf"
+    report_svc.build_pdf(STATE["reports"][rid], path, brief=brief)
+    label = "精简摘要" if brief else "完整报告"
+    return FileResponse(path, media_type="application/pdf",
+                        filename=f"中国房地产产业链波动分析{label}_{rid}.pdf")
 
 
 # ---------- 知识库演示接口 ----------

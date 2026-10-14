@@ -48,7 +48,7 @@ class AssociationResearchTests(unittest.TestCase):
     def test_api_result_keeps_national_series_and_beijing_network_separate(self):
         result = analyze(ResearchRequest())
         self.assertEqual(result["metadata"]["region"], "全国")
-        self.assertIn("北京市", result["network"]["source"]["source"])
+        self.assertIn("全国", result["network"]["source"]["source"])
         self.assertGreaterEqual(result["grey"]["sample_count"], 12)
         self.assertLessEqual(min(r["sample_count"] for r in result["lag"]["lags"]), 96)
         self.assertIn("不混合计算", result["scope"])
@@ -59,7 +59,7 @@ class V2ReportTests(unittest.TestCase):
         from app.services.report import build_markdown
         report = {"question": "新开工变化", "summary": "原摘要", "executive_summary": "执行摘要", "impact": None}
         text = build_markdown(report)
-        for value in ("执行摘要", "贸易信用渠道", "产业链企业", "金融机构", "高校与研究人员", "普通公众", "局限与下一步"):
+        for value in ("执行摘要", "中游贸易信用风险前置", "金融监管部门", "金融机构", "高校与研究人员", "投资者与普通公众", "局限与下一步"):
             self.assertIn(value, text)
         self.assertNotIn("mechanism_notes", report)
 
@@ -69,7 +69,7 @@ class V2ReportTests(unittest.TestCase):
         cases = retrieve_similar_cases("全国水泥行业新开工需求变化", top_k=10)
         self.assertTrue(any(case["id"] == "v2_cement_demand" for case in cases))
         text = build_markdown({"impact": None, "similar_cases": cases})
-        self.assertIn("智能体V2.0迭代内容(1).docx", text)
+        self.assertIn("智能体V2.0迭代内容(3).docx", text)
         self.assertIn("证据状态", text)
         self.assertIn("未作为因果证据", text)
 

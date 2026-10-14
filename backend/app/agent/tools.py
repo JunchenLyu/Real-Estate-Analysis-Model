@@ -72,7 +72,7 @@ TOOL_SCHEMAS = [
         "type": "function",
         "function": {
             "name": "retrieve_similar_cases",
-            "description": "检索 9 个结构化历史房地产风险案例（国际/地区 3 + 房企 6），用于历史对比与经验参照。",
+            "description": "检索结构化房地产风险案例与待核验研究线索，用于历史对比和机制参照；带证据状态的条目不得作为已证实事实。",
             "parameters": {
                 "type": "object",
                 "properties": {

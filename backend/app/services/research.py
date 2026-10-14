@@ -55,12 +55,15 @@ def analyze(request: ResearchRequest):
                                            request.max_lag, request.window)
         network = association.network_metrics(io.A, io.SECTOR_NAMES)
         network["source"] = {"source": io._IO["metadata"]["source"],
+                             "year": io._IO["metadata"].get("year"),
+                             "region": io._IO["metadata"].get("region"),
+                             "sha256": io._IO["metadata"].get("source_sha256"),
                              "note": io._IO["metadata"]["aggregation"]}
         dates = sorted({d for values in selected.values() for d in values})
         return {"dataset_id": dataset["dataset_id"], "metadata": dataset["metadata"],
                 "parameters": request.model_dump(), "grey": grey, "lag": lag, "network": network,
                 "plot": {"dates": dates, "reference": [selected[request.reference].get(d) for d in dates],
                          "target": [selected[request.target].get(d) for d in dates]},
-                "scope": "描述性研究，不计入风险评分；全国时间序列与北京子网络分别展示，不混合计算"}
+                "scope": "描述性研究，不计入风险评分；全国时间序列与全国投入产出子网络分别展示，时序与网络不混合计算"}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc

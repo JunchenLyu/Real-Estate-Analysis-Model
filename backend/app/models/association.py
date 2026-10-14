@@ -178,5 +178,5 @@ def network_metrics(matrix, names):
             "edge_direction": "供应行业i → 使用行业j，边权A_ij（非货币交易额）",
             "edge_count": int(np.count_nonzero(weights)), "node_count": n,
             "ranking": sorted(rows, key=lambda row: -row["pagerank"]),
-            "warnings": ["所有非零边参与计算，不使用展示阈值；结果仅代表所选13部门子网络。",
-                         "中心性不是系统性风险概率，也不是GNN训练结果或全国网络。"]}
+            "warnings": ["所有非零边参与计算，不使用展示阈值；结果仅代表由211部门聚合得到的13部门子网络。",
+                         "中心性不是系统性风险概率，也不是GNN训练结果。"]}

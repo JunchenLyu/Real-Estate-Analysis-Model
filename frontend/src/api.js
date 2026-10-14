@@ -19,6 +19,10 @@ export const kbSearch = (q) => api.get('/api/kb/search', { params: { q } }).then
 export const getHealth = () => api.get('/api/health').then(r => r.data)
 export const getAgentMode = () => api.get('/api/agent/mode').then(r => r.data)
 export const setAgentMode = (mode) => api.post('/api/agent/mode', { mode }).then(r => r.data)
+export const getV2Overview = () => api.get('/api/v2/overview').then(r => r.data)
+export const getV2Cases = () => api.get('/api/v2/cases').then(r => r.data)
+export const getV2Strategies = (stakeholder) => api.get('/api/v2/strategies', { params: stakeholder ? { stakeholder } : {} }).then(r => r.data)
+export const runSimulation = (payload) => api.post('/api/v2/simulate', payload).then(r => r.data)
 
 export const riskColor = (level) => ({
   '低': '#22c55e', '关注': '#eab308', '中': '#f97316', '高': '#ef4444', '极高': '#b91c1c', '-': '#64748b',

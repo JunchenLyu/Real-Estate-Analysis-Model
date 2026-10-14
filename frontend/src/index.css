@@ -13,10 +13,7 @@ html, body, #root { height: 100%; }
 
 body {
   @apply text-slate-200 antialiased;
-  background:
-    radial-gradient(1200px 600px at 85% -10%, rgba(59, 130, 246, 0.12), transparent 60%),
-    radial-gradient(900px 500px at -10% 110%, rgba(34, 211, 238, 0.08), transparent 55%),
-    var(--bg);
+  background: var(--bg);
   font-family: "PingFang SC", "Microsoft YaHei", system-ui, sans-serif;
 }
 
@@ -29,9 +26,9 @@ body {
 /* ---------- 通用玻璃卡片 ---------- */
 .card {
   position: relative;
-  background: linear-gradient(160deg, rgba(23, 34, 56, 0.55), rgba(11, 18, 32, 0.75));
+  background: rgba(11, 18, 32, 0.78);
   border: 1px solid rgba(51, 65, 85, 0.6);
-  border-radius: 16px;
+  border-radius: 8px;
   padding: 20px;
   box-shadow: 0 8px 28px rgba(2, 6, 18, 0.45);
   backdrop-filter: blur(10px);

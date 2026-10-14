@@ -173,9 +173,13 @@ export default function Home() {
               清空对话（{messages.length}）
             </button>
           )}
-          <Link to="/dashboard"
+          <Link to="/upload"
             className="text-sm px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:border-blue-500/60 hover:text-blue-300 hover:bg-blue-600/10 transition-all no-print">
-            查看 Dashboard →
+            上传数据
+          </Link>
+          <Link to="/static"
+            className="text-sm px-4 py-2 rounded-lg border border-slate-700 text-slate-300 hover:border-blue-500/60 hover:text-blue-300 hover:bg-blue-600/10 transition-all no-print">
+            静态分析 →
           </Link>
         </div>
       </header>
@@ -184,7 +188,6 @@ export default function Home() {
         <div className="space-y-5 max-w-4xl w-full mx-auto">
           {messages.length === 0 && (
             <div className="card anim-fade-up overflow-hidden">
-              <div className="absolute -top-16 -right-16 w-56 h-56 rounded-full bg-blue-600/10 blur-3xl pointer-events-none" />
               <div className="flex items-start gap-4">
                 <div className="w-11 h-11 shrink-0 rounded-xl bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-blue-600/30">
                   <svg viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
@@ -308,7 +311,8 @@ export default function Home() {
 
 function ReportView({ report }) {
   const { summary, risk_level, risk_score, affected_industries, industry_scores,
-          transmission_path, model_basis, data_basis, key_indicators, similar_cases, tool_trace, agent_mode, impact } = report
+          transmission_path, model_basis, data_basis, key_indicators, similar_cases, tool_trace, agent_mode, impact,
+          stakeholder_recommendations, strategy_disclaimer } = report
   const color = riskColor(risk_level)
   const impactChart = affected_industries?.length ? {
     tooltip: { trigger: 'axis' },
@@ -459,6 +463,22 @@ function ReportView({ report }) {
               <span key={k} className="text-xs px-2.5 py-1 rounded-md bg-slate-800/80 text-slate-300 border border-slate-700/80">{k}</span>
             ))}
           </div>
+        </div>
+      )}
+
+      {stakeholder_recommendations?.length > 0 && (
+        <div>
+          <div className="section-label mb-3">分主体策略</div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {stakeholder_recommendations.slice(0, 4).map(item => (
+              <div key={item.id || item.stakeholder} className="border border-slate-800 rounded-lg p-3">
+                <div className="text-sm text-slate-200">{item.stakeholder}</div>
+                <div className="text-xs text-slate-400 leading-5 mt-1">{item.actions[0]}</div>
+                <Link to="/strategy" className="inline-block text-xs text-blue-300 mt-2">查看策略与理论依据 →</Link>
+              </div>
+            ))}
+          </div>
+          {strategy_disclaimer && <p className="text-[11px] text-amber-100/70 leading-5 mt-3">{strategy_disclaimer}</p>}
         </div>
       )}
 

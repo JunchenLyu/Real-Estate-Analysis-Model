@@ -1,0 +1,209 @@
+{
+  "disclaimer": "本策略仅基于中国房地产产业链波动传导仿真结果，仅供风险研判参考，不构成任何投资、信贷、行政决策建议。",
+  "models": [
+    {
+      "id": "leontief",
+      "name": "Leontief 需求侧模型",
+      "status": "可运行",
+      "purpose": "测算房地产与建筑业最终需求变化对各部门总产出的直接与间接影响",
+      "formula": "ΔX = (I-A)^(-1)ΔY",
+      "boundary": "固定技术系数的静态数量模型，不处理价格、替代和产能约束",
+      "source_refs": ["theory-demand", "data-national-io-2023"]
+    },
+    {
+      "id": "ghosh",
+      "name": "Ghosh 供给侧模型",
+      "status": "可运行",
+      "purpose": "测算行业初始投入变化沿供给分配关系向下游传导的情景压力",
+      "formula": "ΔX = ΔV(I-B)^(-1)",
+      "boundary": "供给驱动假设争议较大，结果用于压力测试，不是实际产出预测",
+      "source_refs": ["theory-supply", "data-national-io-2023"]
+    },
+    {
+      "id": "grey",
+      "name": "灰色关联分析",
+      "status": "可运行",
+      "purpose": "比较小样本时序曲线的几何接近程度",
+      "formula": "极差标准化后的灰色关联系数均值",
+      "boundary": "关联度不是相关系数、因果强度或风险概率",
+      "source_refs": ["theory-grey", "data-long-cycle"]
+    },
+    {
+      "id": "gisrn",
+      "name": "产业关联加权网络",
+      "status": "可运行",
+      "purpose": "将直接消耗系数转为有向加权网络，观察入强度、出强度和中心性",
+      "formula": "供应行业 i → 使用行业 j，边权 A_ij",
+      "boundary": "中心性描述拓扑位置，不等同于系统性风险或信用等级",
+      "source_refs": ["theory-network", "data-national-io-2023"]
+    },
+    {
+      "id": "gnn",
+      "name": "图神经网络产业联动模型",
+      "status": "待数据",
+      "purpose": "利用企业或产品节点、交易边和时序特征学习非线性传播规律",
+      "formula": "时序图消息传递与监督任务",
+      "boundary": "现有资料没有企业级交易图、节点标签和训练测试划分，不能宣称已完成有效训练",
+      "source_refs": ["theory-gnn"]
+    }
+  ],
+  "theories": [
+    {
+      "id": "theory-demand",
+      "title": "需求端传导",
+      "summary": "房地产与建筑业最终需求变化通过中间投入需求向上游扩散。",
+      "evidence": "2023年全国投入产出表聚合矩阵",
+      "boundary": "静态比较，不代表季度预测"
+    },
+    {
+      "id": "theory-supply",
+      "title": "供给端传导",
+      "summary": "行业初始投入变化通过下游中间使用暴露形成供给侧压力。",
+      "evidence": "Ghosh供给分配系数与2023年全国投入产出表",
+      "boundary": "数量供给情景不能替代价格模型"
+    },
+    {
+      "id": "theory-grey",
+      "title": "灰色关联拓展",
+      "summary": "在样本有限、分布假设不充分时比较序列形态接近程度。",
+      "evidence": "邓聚龙灰色系统方法与用户提供长周期宏观数据",
+      "boundary": "不据此确定时滞或因果"
+    },
+    {
+      "id": "theory-network",
+      "title": "复杂产业网络拓展",
+      "summary": "用投入产出边构建有向加权网络，识别直接关联和高中心性节点。",
+      "evidence": "产业复杂网络文献与全国投入产出矩阵",
+      "boundary": "展示阈值不参与全量网络指标计算"
+    },
+    {
+      "id": "theory-gnn",
+      "title": "GNN研究路线",
+      "summary": "GNN可融合企业交易、库存、财务和时序特征，学习节点级或链级风险任务。",
+      "evidence": "供应链生产函数GNN与产业链风险评估文献",
+      "boundary": "只有完成样本定义、标签审计、时间切分和外样本验证后才能进入模型输出"
+    }
+  ],
+  "mechanisms": [
+    {
+      "id": "trade-credit",
+      "title": "中游贸易信用风险前置",
+      "window": "0-3个月",
+      "path": ["销售回款承压", "工程款与商票结算延迟", "建筑企业应收账款占用", "现金流与坏账压力上升"],
+      "indicators": ["应收账款周转天数", "应收商业承兑汇票", "经营现金流", "客户集中度"],
+      "boundary": "当前企业季度信用面板未完整接入，时间窗是待检验研究假设",
+      "source_refs": ["theory-trade-credit", "data-company-panel-gap"]
+    },
+    {
+      "id": "upstream-demand",
+      "title": "上游实体需求短时滞",
+      "window": "0-6个月",
+      "path": ["销售与资金变化", "拿地和新开工调整", "钢铁水泥玻璃订单变化", "产量与盈利调整"],
+      "indicators": ["房屋新开工面积", "施工面积", "水泥产量", "粗钢产量", "平板玻璃产量"],
+      "boundary": "相关峰值受共同周期和累计值处理影响，不自动确认为因果时滞",
+      "source_refs": ["theory-demand", "data-long-cycle"]
+    },
+    {
+      "id": "downstream-completion",
+      "title": "下游交付需求长时滞",
+      "window": "12-24个月",
+      "path": ["前期销售变化", "施工与交付周期", "竣工面积变化", "家居家电后置需求变化"],
+      "indicators": ["竣工面积", "家电行业收入", "家居行业收入", "毛利率"],
+      "boundary": "建设周期不是固定统计时滞，需用更长样本与稳健性检验确认",
+      "source_refs": ["theory-completion", "data-long-cycle"]
+    },
+    {
+      "id": "procyclical-finance",
+      "title": "金融顺周期放大",
+      "window": "贯穿全周期",
+      "path": ["抵押品与销售预期变化", "金融机构风险偏好变化", "融资供给与成本变化", "房企投资和产业链授信再调整"],
+      "indicators": ["开发贷与按揭投放", "融资成本", "抵押品覆盖率", "现金短债比"],
+      "boundary": "静态投入产出模型未内生银行行为，本模块只表达机制约束",
+      "source_refs": ["theory-finance-cycle"]
+    },
+    {
+      "id": "negative-feedback",
+      "title": "收入与购房需求负向反馈",
+      "window": "6个月后逐步显现",
+      "path": ["产业链经营承压", "用工与收入预期变化", "居民购房能力和意愿变化", "销售回款再次反馈地产端"],
+      "indicators": ["就业人数", "居民收入", "商品房销售面积", "居民杠杆率"],
+      "boundary": "现有数据不足以估计闭环反馈系数，不输出确定性放大倍数",
+      "source_refs": ["theory-feedback"]
+    }
+  ],
+  "strategies": [
+    {
+      "id": "regulator",
+      "stakeholder": "金融监管部门",
+      "objective": "识别跨机构与跨链条风险集中",
+      "actions": ["监测房企、施工企业和供应商的关联敞口与重复担保。", "把建筑企业回款周期和商票逾期纳入产业链信用预警。", "压力测试同时覆盖销售、抵押品和融资收缩情景。"],
+      "indicators": ["逾期敞口", "商票逾期率", "抵押品覆盖率", "关联客户集中度"],
+      "source_refs": ["trade-credit", "procyclical-finance"]
+    },
+    {
+      "id": "government",
+      "stakeholder": "政府部门",
+      "objective": "稳定交付、就业与产业链现金流",
+      "actions": ["按销售、新开工和竣工的不同阶段配置政策工具。", "优先处置影响交付和产业链回款的项目堵点。", "根据新开工变化调整土地和投资节奏，避免政策叠加放大波动。"],
+      "indicators": ["销售面积", "新开工面积", "竣工面积", "建筑业就业"],
+      "source_refs": ["upstream-demand", "downstream-completion", "negative-feedback"]
+    },
+    {
+      "id": "financial-institution",
+      "stakeholder": "金融机构",
+      "objective": "分层管理房企与上下游授信风险",
+      "actions": ["区分房企、施工方和材料供应商的现金流来源与还款安排。", "将应收账龄、商票到期和客户集中度纳入授信复核。", "结合偿债现金流和抵押品复核开展多情景压力测试。"],
+      "indicators": ["现金短债比", "应收账龄", "商票余额", "抵押品覆盖率"],
+      "source_refs": ["trade-credit", "procyclical-finance"]
+    },
+    {
+      "id": "researcher",
+      "stakeholder": "高校与研究人员",
+      "objective": "提高模型口径一致性与可验证性",
+      "actions": ["对齐地区、行业、频率、价格和存量流量口径。", "对时差扫描进行平稳性、多重比较和稳健性检验。", "GNN研究先建立企业交易图、标签审计和时间外样本。"],
+      "indicators": ["有效样本数", "缺失率", "价格平减口径", "外样本表现"],
+      "source_refs": ["theory-grey", "theory-network", "theory-gnn"]
+    },
+    {
+      "id": "upstream-enterprise",
+      "stakeholder": "上游建材与设备企业",
+      "objective": "降低订单和库存对地产开工的单一暴露",
+      "actions": ["以新开工和施工指标复核订单、产能和库存计划。", "评估地产客户集中度，拓展非地产需求。", "区分数量收缩与原材料价格冲击，分别管理库存和毛利风险。"],
+      "indicators": ["新开工面积", "施工面积", "订单覆盖率", "库存周转"],
+      "source_refs": ["upstream-demand"]
+    },
+    {
+      "id": "midstream-enterprise",
+      "stakeholder": "建筑施工与设计企业",
+      "objective": "控制垫资和贸易信用占用",
+      "actions": ["按项目管理垫资额度、结算节点和应收账龄。", "对回款周期持续拉长的客户调整新项目承接条件。", "同步评估向上游拖欠形成的二次传导风险。"],
+      "indicators": ["应收账款周转天数", "经营现金流", "商票到期额", "垫资比例"],
+      "source_refs": ["trade-credit"]
+    },
+    {
+      "id": "downstream-enterprise",
+      "stakeholder": "家居家电与装修企业",
+      "objective": "管理竣工滞后和新房需求收缩",
+      "actions": ["用竣工而非当期销售直接判断交付后需求。", "在长时滞窗口内审慎安排产能与渠道库存。", "发展存量房翻新和更新需求，降低新房单一暴露。"],
+      "indicators": ["竣工面积", "渠道库存", "大宗业务占比", "存量房业务占比"],
+      "source_refs": ["downstream-completion"]
+    },
+    {
+      "id": "investor-public",
+      "stakeholder": "投资者与普通公众",
+      "objective": "区分行业研究结论与个体决策",
+      "actions": ["投资者分别跟踪新开工、建筑应收和竣工三组指标。", "购房者核验项目交付、施工进度和家庭现金流。", "不把演示评分、相关性或单一案例当作买卖和信贷结论。"],
+      "indicators": ["新开工面积", "应收账款周转天数", "竣工面积", "家庭偿债负担"],
+      "source_refs": ["upstream-demand", "trade-credit", "downstream-completion"]
+    }
+  ],
+  "sources": [
+    {"id": "data-national-io-2023", "label": "2023年全国投入产出表", "type": "用户提供数据", "status": "已导入并校验文件指纹"},
+    {"id": "data-long-cycle", "label": "地产产业链长周期数据集 2016-2026", "type": "用户提供数据", "status": "已导入，逐项原始发布值尚待复核"},
+    {"id": "data-company-panel-gap", "label": "企业季度信用与财务面板", "type": "数据缺口", "status": "未完整接入"},
+    {"id": "theory-trade-credit", "label": "房地产企业财务风险与产业链传导文献", "type": "研究文献", "status": "知识库已收录"},
+    {"id": "theory-completion", "label": "房地产销售至竣工与后周期需求文献", "type": "研究文献", "status": "知识库已收录"},
+    {"id": "theory-finance-cycle", "label": "房地产与信贷周期交互影响文献", "type": "研究文献", "status": "知识库已收录"},
+    {"id": "theory-feedback", "label": "房地产与实体经济反馈机制文献", "type": "研究文献", "status": "知识库已收录"}
+  ]
+}

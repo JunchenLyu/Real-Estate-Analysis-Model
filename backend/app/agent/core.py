@@ -23,7 +23,7 @@ SYSTEM_PROMPT = """你是「中国房地产产业链波动分析金融智能体�
 
 ## 表述规范（model_basis 与 summary 必须遵守）
 - Ghosh 结果必须表述为"供给侧投入压力沿产业链传导的情景测算"，而非对实际产出变化的确定性预测；
-- 不得将 B 矩阵解释为"本地产出的销售分配比例"（地区表中间使用含跨地区调入/进口，B 反映各下游部门对该产品的中间使用暴露强度）；
+- 不得将 B 矩阵解释为"本地产出的销售分配比例"（全国竞争型表中间使用包含进口品，B 反映各下游部门对该产品的中间使用暴露强度）；
 - 不得省略公式中的 (I-B)⁻¹ 与 B=D⁻¹Z 口径。
 
 ## 最终输出（必须是合法 JSON，不要输出其他任何文字）
@@ -250,8 +250,8 @@ class RiskAgent:
         if impact:
             report["impact"] = impact  # 模型结果强制覆盖（LLM 不产生数字）
             # 口径声明强制追加到摘要尾部（LLM 措辞不受控，用固定声明保证口径一致）
-            disclaimer = ("｜口径说明：本结果为基于北京市2023年投入产出表的13部门需求/供给侧"
-                          "关联压力情景测算，不解释为北京市各行业实际产出变化的确定性预测；"
+            disclaimer = ("｜口径说明：本结果为基于2023年全国211部门投入产出表聚合的13部门需求/供给侧"
+                          "关联压力情景测算，不解释为全国各行业实际产出变化的确定性预测；"
                           "量化数值以本报告结构化表格（模型引擎计算）为准。")
             if "口径说明" not in str(report.get("summary", "")):
                 report["summary"] = str(report.get("summary", "")) + disclaimer
@@ -675,17 +675,17 @@ def _compose_report(question, kb, impact, industry_scores, agg, similar_cases, u
             summary = (
                 f"针对「{question}」：基于Ghosh供给侧模型（标准供给分配口径 B=D⁻¹Z）测算，情景「{impact['scenario']}」"
                 f"将通过中间投入成本渠道带来产业关联层面的总产出情景变动约 {abs(impact['total_output_change_yi']):,.0f} 亿元"
-                f"（占地区总产出 {abs(impact['total_output_change_pct'])}%）。"
+                f"（占全国13部门基准总产出 {abs(impact['total_output_change_pct'])}%）。"
                 f"受影响最大的行业依次为：{top_desc}。"
                 f"综合风险评分 {agg['risk_score']}（{agg['risk_level']}）。"
                 f"供给侧冲击沿'上游供给收缩 → 中间投入成本上升 → 下游生产受阻'传导，"
                 f"与需求侧冲击（Leontief）形成互补：本情景属于供给约束型冲击。"
-                f"注意：地区表中间使用含调入因素，结果应解读为投入需求/产业关联压力的情景测算。"
+                f"注意：全国竞争型表的中间使用包含进口品，结果应解读为投入需求/产业关联压力的情景测算。"
             )
             model_basis = (f"Ghosh供给侧模型（标准口径）ΔX=ΔV·(I-B)^(-1)，供给分配系数按卖方部门总产出系数化"
                            f"（B=D⁻¹Z，与A为相似矩阵，谱半径相同、数值稳定可解）；"
                            f"以{impact['scenario']}模拟初始投入变动，供给推动乘数 {impact.get('supply_multiplier')}。"
-                           f"口径说明：地区表中间使用含跨地区调入/进口，B反映各下游部门对该产品的"
+                           f"口径说明：全国竞争型表中间使用包含进口品，B反映各下游部门对该产品的"
                            f"中间使用暴露强度，结果应解读为供给侧投入压力沿产业链传导的情景测算")
             transmission = [
                 f"「{impact['scenario'].split('供给侧')[0]}」供给收缩，初始投入（增加值）直接减少",
@@ -695,15 +695,15 @@ def _compose_report(question, kb, impact, industry_scores, agg, similar_cases, u
             ]
         else:
             summary = (
-                f"针对「{question}」：基于13部门投入产出模型（北京市2023年表）测算，"
+                f"针对「{question}」：基于13部门投入产出模型（2023年全国211部门表聚合）测算，"
                 f"本情景设定为「{impact['scenario']}」，"
                 f"测算得投入需求端的产业关联压力约 {abs(impact['total_output_change_yi']):,.0f} 亿元"
-                f"（占地区总产出 {abs(impact['total_output_change_pct'])}%）。"
+                f"（占全国13部门基准总产出 {abs(impact['total_output_change_pct'])}%）。"
                 f"受影响最大的行业依次为：{top_desc}。"
                 f"综合风险评分 {agg['risk_score']}（{agg['risk_level']}）。"
                 f"传导路径为：房地产投资收缩 → 上游原材料需求下降 → 中游建造活动放缓 → 下游耐用品消费承压，"
                 f"并通过金融渠道放大。该结果为需求侧投入关联的情景测算，"
-                f"不解释为北京市各行业实际产出变化的确定性预测。"
+                f"不解释为全国各行业实际产出变化的确定性预测。"
             )
             model_basis = (f"列昂惕夫投入产出模型 X=(I-A)^(-1)Y：房地产乘数 {impact['real_estate_multiplier']}、"
                            f"建筑业乘数 {impact['construction_multiplier']}；冲击情景：{impact['scenario']}")

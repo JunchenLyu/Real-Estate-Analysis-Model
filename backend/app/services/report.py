@@ -1,5 +1,11 @@
-"""Module 5: 报告生成 —— 结构化 JSON → Markdown 金融分析报告"""
-from ..config import REPORTS_DIR
+"""Module 5: structured report generation in Markdown and PDF."""
+import json
+import os
+import re
+from pathlib import Path
+from xml.sax.saxutils import escape
+
+from ..config import DATA_DIR, REPORTS_DIR
 
 
 def _fmt(v, fmt_str="{:+,.0f}"):
@@ -43,22 +49,28 @@ def _industries_md(rows: list[dict]) -> str:
 
 
 def enrich_v2(report: dict) -> dict:
+    content = json.loads((DATA_DIR / "v2_content.json").read_text(encoding="utf-8"))
+    source_labels = {
+        **{item["id"]: item["title"] for item in content["theories"]},
+        **{item["id"]: item["title"] for item in content["mechanisms"]},
+        **{item["id"]: item["label"] for item in content["sources"]},
+    }
+    label_refs = lambda refs: [source_labels.get(ref, ref) for ref in refs]
     impact = report.get("impact") or {}
     expansion = impact.get("total_output_change_yi", 0) > 0
     context = "数量扩张情景：关注承接能力和资金占用，不能据此推断违约风险上升。" if expansion else "收缩或未量化情景：核验订单、回款和现金流，不据此推断具体企业必然违约。"
     report["report_version"] = "2.0"
-    report["mechanism_notes"] = [
-        {"name": "实体需求渠道", "path": "销售回款 → 新开工与施工计划 → 钢铁、建材及设备订单", "indicators": ["销售面积", "新开工面积", "工业品产量", "营业收入"], "boundary": "数量模型刻画投入关联；不直接估计企业收入或利润。"},
-        {"name": "贸易信用渠道", "path": "回款变化 → 工程款及商票结算 → 应收占款 → 供应商现金流", "indicators": ["应收账款周转天数", "逾期商票", "经营现金流", "客户集中度"], "boundary": "企业季度面板尚未接入，当前为待验证机制，不能由宏观相关系数确认。"},
-        {"name": "交付与后周期需求", "path": "项目施工与竣工交付 → 装修、家具及家电需求", "indicators": ["竣工面积", "家具家电收入", "毛利率"], "boundary": "建设周期不等于固定统计时滞；0—6、0—3、12—24个月仅为资料提出的待检验窗口。"},
-        {"name": "收入与融资反馈", "path": "企业经营变化 → 就业收入与融资能力 → 购房需求及投资计划", "indicators": ["居民收入", "就业", "现金短债比", "融资成本"], "boundary": "现有静态模型未内生估计该反馈，不代表已完成动态因果仿真。"},
-    ]
+    report["mechanism_notes"] = [{
+        "id": item["id"], "name": item["title"], "window": item["window"],
+        "path": " → ".join(item["path"]), "indicators": item["indicators"],
+        "boundary": item["boundary"], "source_refs": label_refs(item["source_refs"]),
+    } for item in content["mechanisms"]]
     report["stakeholder_recommendations"] = [
-        {"stakeholder": "产业链企业", "actions": ["按项目梳理回款、应收账龄和商票到期日，进行现金流压力测试。", "复核客户集中度、订单与库存匹配，避免把行业情景直接当作企业预测。"], "indicators": ["应收账款周转天数", "经营现金流", "客户集中度"]},
-        {"stakeholder": "金融机构", "actions": ["区分房企、施工企业和供应商敞口，核验关联客户及重复担保。", "结合偿债现金流和抵押品复核进行多情景压力测试，不用网络中心性代替信用评级。"], "indicators": ["现金短债比", "逾期敞口", "抵押品覆盖率"]},
-        {"stakeholder": "高校与研究人员", "actions": ["对齐地区、行业、频率及现价口径；累计流量和存量分开处理。", "补充企业面板，进行平稳性与稳健性检验；样本内相关峰值不作为因果证据。"], "indicators": ["有效样本数", "缺失率", "时差相关", "价格平减口径"]},
-        {"stakeholder": "普通公众", "actions": ["核验项目交付、交易信息及家庭现金流，不据演示评分作买卖决定。", "区分行业研究结论与个人财务情况，必要时咨询专业人员。"], "indicators": ["家庭偿债负担", "现金储备", "交付信息"]},
+        {**item, "source_refs": label_refs(item["source_refs"])}
+        for item in content["strategies"]
     ]
+    report["strategy_disclaimer"] = content["disclaimer"]
+    report["model_registry"] = content["models"]
     report["analysis_limitations"] = [context, "静态投入产出结果不是未来实际产出的预测；固定系数未考虑替代、产能约束与价格变化。", "风险评分是演示性指标，不是违约概率；案例只能提供机制线索，不能证明统一时滞。", "产业关联研究可在独立研究页运行，灰色关联及网络中心性不能替代价格模型。"]
     return report
 
@@ -166,13 +178,16 @@ def build_markdown(report: dict) -> str:
         lines.append(f"- {k}")
     lines += ["\n## 7. 机制分析与验证边界"]
     for item in report["mechanism_notes"]:
-        lines += [f"\n### {item['name']}", item["path"],
-                  f"- 验证指标：{'、'.join(item['indicators'])}", f"- 边界：{item['boundary']}"]
+        lines += [f"\n### {item['name']}（{item['window']}）", item["path"],
+                  f"- 验证指标：{'、'.join(item['indicators'])}", f"- 边界：{item['boundary']}",
+                  f"- 理论依据：{'、'.join(item['source_refs'])}"]
     lines += ["\n## 8. 分主体行动建议（研究参考）"]
     for item in report["stakeholder_recommendations"]:
         lines.append(f"\n### {item['stakeholder']}")
         lines.extend(f"- {action}" for action in item["actions"])
         lines.append(f"- 关注指标：{'、'.join(item['indicators'])}")
+        lines.append(f"- 理论依据：{'、'.join(item['source_refs'])}")
+    lines.append(f"\n> {report['strategy_disclaimer']}")
     lines += ["\n## 9. 局限与下一步"]
     lines.extend(f"- {item}" for item in report["analysis_limitations"])
     lines += ["\n---\n*本报告由中国房地产产业链波动分析金融智能体自动生成（LLM Agent + 投入产出模型 + 风险评分模型 + RAG知识库），仅供研究演示，不构成投资建议。*"]
@@ -183,4 +198,144 @@ def save_report(report: dict) -> str:
     md = build_markdown(report)
     path = REPORTS_DIR / f"{report['report_id']}.md"
     path.write_text(md, encoding="utf-8")
+    return str(path)
+
+
+def build_brief_markdown(report: dict) -> str:
+    report = enrich_v2(dict(report))
+    impacts = (report.get("affected_industries") or [])[:5]
+    mechanisms = report["mechanism_notes"][:3]
+    lines = [
+        "# 中国房地产产业链波动分析精简摘要",
+        f"\n**问题：** {report.get('question', '—')}",
+        f"\n{report.get('executive_summary') or report.get('summary') or '暂无摘要'}",
+    ]
+    if impacts:
+        lines += ["\n## 核心量化结果"]
+        lines.extend(f"- {item['industry']}：产出变动 {item.get('impact_pct', '—')}%" for item in impacts)
+    lines += ["\n## 关键传导机制"]
+    lines.extend(f"- {item['name']}（{item['window']}）：{item['path']}" for item in mechanisms)
+    lines += ["\n## 优先关注指标"]
+    lines.extend(f"- {item}" for item in (report.get("key_indicators") or [])[:6])
+    lines += ["\n## 结论边界"]
+    lines.extend(f"- {item}" for item in report["analysis_limitations"][:3])
+    lines.append(f"\n> {report['strategy_disclaimer']}")
+    return "\n".join(lines)
+
+
+def _plain_markdown(text: str) -> str:
+    text = re.sub(r"\*\*(.*?)\*\*", r"\1", text)
+    text = re.sub(r"`([^`]*)`", r"\1", text)
+    return escape(text.strip())
+
+
+def build_pdf(report: dict, path: str | Path, brief: bool = False) -> str:
+    from reportlab.lib import colors
+    from reportlab.lib.pagesizes import A4
+    from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+    from reportlab.lib.units import mm
+    from reportlab.pdfbase import pdfmetrics
+    from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+    font_name = "ReportCJK"
+    if font_name not in pdfmetrics.getRegisteredFontNames():
+        windows_fonts = Path(os.getenv("WINDIR", "C:/Windows")) / "Fonts"
+        candidates = [
+            os.getenv("PDF_FONT_PATH"),
+            "/System/Library/Fonts/Supplemental/Arial Unicode.ttf",
+            "/System/Library/Fonts/Hiragino Sans GB.ttc",
+            "/System/Library/Fonts/STHeiti Medium.ttc",
+            "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+            "/usr/share/fonts/truetype/wqy/wqy-microhei.ttc",
+            str(windows_fonts / "msyh.ttc"),
+            str(windows_fonts / "simsun.ttc"),
+        ]
+        for candidate in candidates:
+            if candidate and Path(candidate).is_file():
+                try:
+                    pdfmetrics.registerFont(TTFont(font_name, candidate, subfontIndex=0))
+                    break
+                except Exception:
+                    continue
+        else:
+            font_name = "STSong-Light"
+            if font_name not in pdfmetrics.getRegisteredFontNames():
+                pdfmetrics.registerFont(UnicodeCIDFont(font_name))
+    base = getSampleStyleSheet()
+    title_size, title_after = (17, 6 * mm) if brief else (19, 10 * mm)
+    heading_size, heading_before = (12, 3 * mm) if brief else (13, 5 * mm)
+    body_size, body_leading, body_after = (9, 13, 1.1 * mm) if brief else (9.5, 15, 1.8 * mm)
+    quote_size, quote_leading = (8.5, 12) if brief else (9, 14)
+    styles = {
+        "title": ParagraphStyle("CNTitle", parent=base["Title"], fontName=font_name, fontSize=title_size,
+                                leading=23 if brief else 25, textColor=colors.HexColor("#111827"), spaceAfter=title_after),
+        "h2": ParagraphStyle("CNH2", parent=base["Heading2"], fontName=font_name, fontSize=heading_size,
+                             leading=16 if brief else 18, textColor=colors.HexColor("#111827"),
+                             spaceBefore=heading_before, spaceAfter=1.5 * mm if brief else 2 * mm),
+        "h3": ParagraphStyle("CNH3", parent=base["Heading3"], fontName=font_name, fontSize=11,
+                             leading=16, textColor=colors.HexColor("#1F2937"), spaceBefore=3 * mm, spaceAfter=1.5 * mm),
+        "body": ParagraphStyle("CNBody", parent=base["BodyText"], fontName=font_name, fontSize=body_size,
+                               leading=body_leading, textColor=colors.HexColor("#374151"), spaceAfter=body_after),
+        "quote": ParagraphStyle("CNQuote", parent=base["BodyText"], fontName=font_name, fontSize=quote_size,
+                                leading=quote_leading, leftIndent=5 * mm, textColor=colors.HexColor("#4B5563"),
+                                borderColor=colors.HexColor("#9CA3AF"), borderWidth=0, borderPadding=2 * mm),
+    }
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    document = SimpleDocTemplate(str(path), pagesize=A4, rightMargin=18 * mm, leftMargin=18 * mm,
+                                 topMargin=(14 if brief else 16) * mm,
+                                 bottomMargin=(14 if brief else 16) * mm,
+                                 title="中国房地产产业链波动分析报告")
+    story = []
+    markdown = build_brief_markdown(report) if brief else build_markdown(report)
+    lines = markdown.splitlines()
+    index = 0
+    while index < len(lines):
+        raw = lines[index].strip()
+        if not raw or raw == "---":
+            index += 1
+            continue
+        if raw.startswith("|") and index + 1 < len(lines) and re.match(r"^\|[-| :]+\|$", lines[index + 1].strip()):
+            rows = [[_plain_markdown(cell) for cell in raw.strip("|").split("|")]]
+            index += 2
+            while index < len(lines) and lines[index].strip().startswith("|"):
+                rows.append([_plain_markdown(cell) for cell in lines[index].strip().strip("|").split("|")])
+                index += 1
+            cells = [[Paragraph(cell, styles["body"]) for cell in row] for row in rows]
+            widths = [document.width / len(cells[0])] * len(cells[0])
+            table = Table(cells, colWidths=widths, repeatRows=1, hAlign="LEFT")
+            table.setStyle(TableStyle([
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#E5E7EB")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#111827")),
+                ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#D1D5DB")),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 4), ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                ("TOPPADDING", (0, 0), (-1, -1), 4), ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+            ]))
+            story.extend([table, Spacer(1, 3 * mm)])
+            continue
+        if raw.startswith("# "):
+            story.append(Paragraph(_plain_markdown(raw[2:]), styles["title"]))
+        elif raw.startswith("## "):
+            story.append(Paragraph(_plain_markdown(raw[3:]), styles["h2"]))
+        elif raw.startswith("### "):
+            story.append(Paragraph(_plain_markdown(raw[4:]), styles["h3"]))
+        elif raw.startswith("> "):
+            story.append(Paragraph(_plain_markdown(raw[2:]), styles["quote"]))
+        elif re.match(r"^(?:- |\d+\. )", raw):
+            story.append(Paragraph("• " + _plain_markdown(re.sub(r"^(?:- |\d+\. )", "", raw)), styles["body"]))
+        else:
+            story.append(Paragraph(_plain_markdown(raw), styles["body"]))
+        index += 1
+
+    def footer(canvas, doc):
+        canvas.saveState()
+        canvas.setFont(font_name, 8)
+        canvas.setFillColor(colors.HexColor("#6B7280"))
+        canvas.drawCentredString(A4[0] / 2, 8 * mm, f"第 {doc.page} 页")
+        canvas.restoreState()
+
+    document.build(story, onFirstPage=footer, onLaterPages=footer)
     return str(path)
